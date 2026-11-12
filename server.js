@@ -62,4 +62,17 @@ setInterval(() => {
   }
 }, 10000);
 
+// Báo lỗi dễ hiểu khi cổng đã bị chương trình khác (thường là server cũ) chiếm
+function onListenError(err) {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`\n❌ Cổng ${PORT} đang bị chiếm (có thể server cũ vẫn đang chạy ở terminal khác).`);
+    console.error('   Cách 1: tắt server cũ (Ctrl + C ở terminal đó) rồi chạy lại npm start');
+    console.error(`   Cách 2: chạy ở cổng khác. PowerShell: $env:PORT=${PORT + 1}; npm start   |   Mac/Linux: PORT=${PORT + 1} npm start\n`);
+    process.exit(1);
+  }
+  throw err;
+}
+server.on('error', onListenError);
+wss.on('error', () => {});   // lỗi cổng đã được server.on('error') xử lý, tránh in lặp 2 lần
+
 server.listen(PORT, () => console.log(`🎈 Bubble Boom chạy tại http://localhost:${PORT}`));
