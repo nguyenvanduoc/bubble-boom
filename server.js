@@ -4,11 +4,13 @@
 // ============================================================
 import http from 'node:http';
 import { readFile } from 'node:fs/promises';
-import { extname, join, resolve, sep } from 'node:path';
+import { extname, join, resolve, sep, dirname } from 'node:path';
+import { randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 import { Lobby } from './public/shared/rooms.js';
 import { FileStore } from './profile-store.js';
+import { createAdmin } from './admin.js';
 
 const PORT = Number(process.env.PORT) || 3000;
 const PUBLIC = resolve(join(fileURLToPath(new URL('.', import.meta.url)), 'public'));
@@ -23,6 +25,7 @@ const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, 'http://x');
     if (url.pathname === '/health') { res.writeHead(200); return res.end('ok'); }
+    if (await admin(req, res, url)) return;                  // API quản trị /api/admin/...
     // Xét dấu '/' trên URL TRƯỚC khi đổi sang đường dẫn hệ điều hành
     // (Windows dùng '\' nên kiểm tra sau khi normalize sẽ sai -> lỗi "Not found")
     let rel = decodeURIComponent(url.pathname);
@@ -39,8 +42,14 @@ const server = http.createServer(async (req, res) => {
 
 // ---------- WebSocket: mỗi kết nối = 1 người chơi ----------
 const ROOT = fileURLToPath(new URL('.', import.meta.url));
-const store = new FileStore(process.env.DATA_FILE || join(ROOT, 'data', 'profiles.json'));
+const DATA_FILE = process.env.DATA_FILE || join(ROOT, 'data', 'profiles.json');
+const store = new FileStore(DATA_FILE);
 const lobby = new Lobby(store);
+
+// ---------- Quản trị: mật khẩu lấy từ biến môi trường ADMIN_PASSWORD ----------
+// Không đặt -> tạo mật khẩu ngẫu nhiên mỗi lần chạy và in ra terminal
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || randomBytes(6).toString('hex');
+const admin = createAdmin({ store, lobby, password: ADMIN_PASSWORD, logFile: join(dirname(DATA_FILE), 'admin-log.json') });
 const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 4096, perMessageDeflate: false });
 
 wss.on('connection', (ws) => {
@@ -81,4 +90,13 @@ wss.on('error', () => {});   // lỗi cổng đã được server.on('error') x�
 // Tắt server (Ctrl + C) -> lưu ví xu của mọi người trước khi thoát
 for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { store.flushSync(); process.exit(0); });
 
-server.listen(PORT, () => console.log(`🎈 Bubble Boom chạy tại http://localhost:${PORT}`));
+server.listen(PORT, () => {
+  console.log(`🎈 Bubble Boom chạy tại http://localhost:${PORT}`);
+  console.log(`🔐 Trang quản trị: http://localhost:${PORT}/admin.html`);
+  if (!process.env.ADMIN_PASSWORD) {
+    console.log(`   Mật khẩu admin TẠM (đổi mỗi lần chạy): ${ADMIN_PASSWORD}`);
+    console.log('   Muốn cố định: PowerShell  $env:ADMIN_PASSWORD="matkhau-cua-ban"; npm start');
+  } else if (ADMIN_PASSWORD.length < 8) {
+    console.log('   ⚠️  ADMIN_PASSWORD nên dài ít nhất 8 ký tự');
+  }
+});

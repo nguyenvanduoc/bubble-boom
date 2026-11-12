@@ -226,7 +226,16 @@ function openShop() {
 }
 function updateCoins() {
   document.querySelectorAll('.coins').forEach((el) => { el.textContent = `🪙 ${S.profile ? S.profile.coins : 0}`; });
+  // mã người chơi công khai (offline không có admin nên ẩn đi)
+  document.querySelectorAll('.pid-line').forEach((el) => el.classList.toggle('hidden', S.offline || !S.profile?.pid));
+  document.querySelectorAll('.pid').forEach((el) => { el.textContent = S.profile?.pid || '…'; });
 }
+document.querySelectorAll('[data-copy-pid]').forEach((b) => {
+  b.onclick = async () => {
+    const pid = S.profile?.pid; if (!pid) return;
+    try { await navigator.clipboard.writeText(pid); toast('Đã sao chép mã ' + pid); } catch { toast('Mã của bạn: ' + pid); }
+  };
+});
 const TAB_NOTES = {
   item: 'Mua bao nhiêu cũng được. Mỗi trận tự mang theo tối đa số lượng ghi trên thẻ; dùng không hết được hoàn lại.',
   outfit: 'Trang phục chỉ đổi ngoại hình, mọi người trong trận đều nhìn thấy. Bấm "Thử" để xem trước.',

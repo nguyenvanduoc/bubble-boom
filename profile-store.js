@@ -21,6 +21,16 @@ export class FileStore {
     return fixProfile(this.data[token] || (this.data[token] = newProfile()));
   }
 
+  /** Tất cả hồ sơ: [[token, profile], ...] (chỉ server dùng, token không bao giờ gửi cho admin) */
+  entries() {
+    return Object.entries(this.data).map(([t, p]) => [t, fixProfile(p)]);
+  }
+
+  /** Tìm hồ sơ theo mã người chơi công khai */
+  findPid(pid) {
+    return this.entries().find(([, p]) => p.pid === pid) || null;
+  }
+
   save() {
     if (this.timer) return;
     this.timer = setTimeout(async () => {

@@ -262,3 +262,6 @@ kbd { font: inherit; font-weight: 700; padding: 0 6px; border-radius: 6px; backg
 
 /* máy cảm ứng không có bàn phím -> ẩn chữ phím tắt */
 @media (pointer: coarse) { .stat kbd { display: none; } }
+
+.pid-line { margin: 0 0 10px; }
+.pid-line .pid { font-family: ui-monospace, Consolas, monospace; letter-spacing: 1px; color: var(--primary); }

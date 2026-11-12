@@ -34,6 +34,31 @@ Cửa hàng có 4 tab. Mua thì trừ xu ngay; vật phẩm được tự độn
 - **Ví online** lưu trên server ở file `data/profiles.json` (đổi chỗ lưu bằng biến `DATA_FILE`). **Ví offline** lưu trong trình duyệt.
 - Một số dịch vụ miễn phí xoá ổ đĩa mỗi lần khởi động lại. Khi đó cần gắn ổ đĩa lưu trữ (persistent disk) để giữ ví.
 
+## Xu lấy từ đâu?
+
+1. **Người mới** được tặng 300 xu.
+2. **Thưởng sau mỗi trận:** +20 khi tham gia, +60 khi thắng, +15 cho mỗi đối thủ hạ được, +1 cho mỗi thùng phá được.
+3. **Admin cấp xu** qua trang quản trị (xem bên dưới).
+
+## Trang quản trị: cấp xu cho người chơi
+
+1. Chạy server kèm mật khẩu admin:
+   ```powershell
+   $env:ADMIN_PASSWORD="mat-khau-cua-ban"; npm start
+   ```
+   Trên Mac/Linux: `ADMIN_PASSWORD=mat-khau-cua-ban npm start`. Nếu không đặt, server tự tạo **mật khẩu tạm** (đổi mỗi lần chạy) và in ra terminal.
+2. Mở `http://localhost:3000/admin.html` và đăng nhập.
+3. Người chơi xem **Mã người chơi** (dạng `BB7KQ2XM`) ở sảnh chờ hoặc trong cửa hàng, rồi gửi mã đó cho admin.
+4. Admin tìm theo mã hoặc tên (gõ không dấu cũng được), bấm **🪙 Cấp xu**, nhập số xu (số âm để trừ) và lý do, rồi bấm Xác nhận.
+5. Nếu người chơi đang online, họ nhận ngay thông báo "🎁 Admin đã tặng bạn … xu!" và số xu được cập nhật.
+
+**Bảo mật:**
+- Sai mật khẩu 5 lần thì IP đó bị khoá 10 phút. Phiên đăng nhập hết hạn sau 12 giờ, và mất khi đóng tab.
+- Mật khẩu được so sánh bằng `crypto.timingSafeEqual`.
+- Admin chỉ thấy mã công khai, không bao giờ thấy token bí mật của ví.
+- Mỗi lần cấp hay trừ xu đều được ghi vào `data/admin-log.json` và in ra terminal.
+- Mỗi lần cấp tối đa 1.000.000 xu. Ví không bao giờ bị âm.
+
 ## Giảm độ trễ khi đặt bóng
 
 - Client **dự đoán** việc đặt bóng: quả bóng hiện và kêu ngay khi bấm phím, rồi được thay bằng bóng thật khi server xác nhận. Nếu server từ chối, bóng dự đoán tự biến mất.
@@ -75,6 +100,7 @@ Bất kỳ dịch vụ nào hỗ trợ **Node.js + WebSocket** đều dùng đư
 ```
 server.js                 HTTP tĩnh + WebSocket
 profile-store.js          Lưu ví xu của người chơi ra file JSON
+admin.js                  API quản trị: đăng nhập, danh sách người chơi, cấp xu, lịch sử
 public/
   index.html, style.css   Giao diện
   shared/                 DÙNG CHUNG server & trình duyệt
@@ -85,6 +111,7 @@ public/
     rooms.js              Sảnh + phòng + vòng lặp 30 tick/giây
   js/
     main.js               Giao diện, dự đoán chuyển động, nội suy
+    admin.js              Trang quản trị (admin.html)
     render.js             Vẽ Canvas
     net.js                Kết nối online/offline
     input.js              Bàn phím + nút cảm ứng

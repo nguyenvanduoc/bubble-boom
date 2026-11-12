@@ -33,6 +33,17 @@ export class Lobby {
   disconnect(c) {
     this.leave(c);
     this.clients.delete(c.id);
+    if (c.profile) { c.profile.lastSeen = Date.now(); this.store.save(); }
+  }
+
+  /** Token của những người đang online (cho trang admin) */
+  onlineTokens() {
+    return new Set([...this.clients.values()].map((c) => c.token).filter(Boolean));
+  }
+
+  /** Gửi lại ví mới nhất cho người chơi đang online (sau khi admin cấp xu) */
+  notifyProfile(token, msg) {
+    for (const c of this.clients.values()) if (c.token === token) this.sendProfile(c, msg);
   }
 
   handle(c, m) {
@@ -46,6 +57,9 @@ export class Lobby {
         // token = "chìa khoá" của ví xu, client lưu lại để lần sau dùng tiếp
         c.token = TOKEN_RE.test(m.token) ? m.token : genToken();
         c.profile = this.store.get(c.token);
+        c.profile.name = c.name;                 // để admin tìm được theo tên
+        c.profile.lastSeen = Date.now();
+        this.store.save();
         this.sendProfile(c);
         c.send(this.lobbyMsg());
         break;

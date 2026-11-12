@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Quản trị Bubble Boom</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .narrow { max-width: 460px; margin: 0 auto 14px; }
+    .admin-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; }
+    .admin-stats .panel { margin: 0; text-align: center; }
+    .admin-stats b { display: block; font-size: 1.6rem; line-height: 1.1; }
+    .table-wrap { overflow-x: auto; margin-top: 10px; }
+    table { width: 100%; border-collapse: collapse; font-size: .95rem; }
+    th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+    th { color: var(--muted); font-weight: 700; font-size: .85rem; }
+    td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--line); margin-right: 6px; }
+    .dot.on { background: #2fc46b; }
+    .plus { color: #1f9d55; font-weight: 800; } .minus { color: #e2473d; font-weight: 800; }
+    dialog { border: none; border-radius: 20px; padding: 18px; width: min(420px, calc(100% - 32px)); background: var(--panel); color: var(--text); box-shadow: var(--shadow); }
+    dialog::backdrop { background: rgba(15, 25, 50, .5); }
+    .presets .btn { flex: 1; }
+    code { font-weight: 700; }
+  </style>
+</head>
+<body>
+<main id="app">
+  <header class="logo">
+    <h1>Bubble<span>Boom</span></h1>
+    <p>Trang quản trị · cấp xu cho người chơi</p>
+  </header>
+
+  <!-- Đăng nhập -->
+  <section id="login" class="panel narrow">
+    <h3>🔐 Đăng nhập admin</h3>
+    <form id="login-form" class="row gap wrap">
+      <input id="pw" type="password" placeholder="Mật khẩu admin" autocomplete="current-password" required>
+      <button class="btn primary">Đăng nhập</button>
+    </form>
+    <p class="muted small">Mật khẩu đặt bằng biến môi trường <code>ADMIN_PASSWORD</code> khi chạy server. Nếu không đặt, server tự tạo mật khẩu tạm và in ra terminal.</p>
+  </section>
+
+  <!-- Bảng điều khiển -->
+  <section id="dash" class="hidden">
+    <div class="topbar">
+      <a class="btn ghost" href="./">← Vào game</a>
+      <h2>Quản lý xu</h2>
+      <button id="logout" class="btn ghost">Đăng xuất</button>
+    </div>
+    <div class="admin-stats">
+      <div class="panel"><b id="st-total">0</b><span class="muted small">người chơi</span></div>
+      <div class="panel"><b id="st-online">0</b><span class="muted small">đang online</span></div>
+      <div class="panel"><b id="st-coins">0</b><span class="muted small">tổng xu</span></div>
+    </div>
+    <div class="panel">
+      <div class="row gap wrap">
+        <input id="q" placeholder="Tìm theo mã người chơi (BB…) hoặc tên" autocomplete="off">
+        <button id="refresh" class="btn">Làm mới</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Mã</th><th>Tên</th><th class="num">Xu</th><th class="num">Trận / Thắng</th><th>Lần cuối</th><th></th></tr></thead>
+          <tbody id="players"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="panel">
+      <h3>📜 Lịch sử cấp xu</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Thời gian</th><th>Người chơi</th><th class="num">Số xu</th><th class="num">Trước → Sau</th><th>Lý do</th></tr></thead>
+          <tbody id="log"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- Hộp thoại cấp xu -->
+<dialog id="grant">
+  <form id="grant-form">
+    <h3>Cấp xu cho <span id="g-name"></span></h3>
+    <p class="muted small">Mã <b id="g-pid"></b> · đang có <b id="g-coins"></b> xu</p>
+    <div class="row gap wrap presets">
+      <button type="button" class="btn small" data-amt="100">+100</button>
+      <button type="button" class="btn small" data-amt="500">+500</button>
+      <button type="button" class="btn small" data-amt="1000">+1.000</button>
+      <button type="button" class="btn small" data-amt="5000">+5.000</button>
+      <button type="button" class="btn small" data-amt="-100">−100</button>
+    </div>
+    <label class="field mt"><span>Số xu (nhập số âm để trừ)</span><input id="g-amount" type="number" step="1" required></label>
+    <label class="field"><span>Lý do</span><input id="g-reason" maxlength="100" placeholder="VD: Thưởng sự kiện, nạp xu, đền bù lỗi..."></label>
+    <p id="g-preview" class="small"></p>
+    <div class="row gap">
+      <button type="button" id="g-cancel" class="btn">Huỷ</button>
+      <button id="g-ok" class="btn primary">Xác nhận</button>
+    </div>
+  </form>
+</dialog>
+<div id="toast" class="toast"></div>
+<script type="module" src="js/admin.js"></script>
+</body>
+</html>
