@@ -8,6 +8,7 @@ import { extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 import { Lobby } from './public/shared/rooms.js';
+import { FileStore } from './profile-store.js';
 
 const PORT = Number(process.env.PORT) || 3000;
 const PUBLIC = resolve(join(fileURLToPath(new URL('.', import.meta.url)), 'public'));
@@ -37,7 +38,9 @@ const server = http.createServer(async (req, res) => {
 });
 
 // ---------- WebSocket: mỗi kết nối = 1 người chơi ----------
-const lobby = new Lobby();
+const ROOT = fileURLToPath(new URL('.', import.meta.url));
+const store = new FileStore(process.env.DATA_FILE || join(ROOT, 'data', 'profiles.json'));
+const lobby = new Lobby(store);
 const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 4096, perMessageDeflate: false });
 
 wss.on('connection', (ws) => {
@@ -74,5 +77,8 @@ function onListenError(err) {
 }
 server.on('error', onListenError);
 wss.on('error', () => {});   // lỗi cổng đã được server.on('error') xử lý, tránh in lặp 2 lần
+
+// Tắt server (Ctrl + C) -> lưu ví xu của mọi người trước khi thoát
+for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { store.flushSync(); process.exit(0); });
 
 server.listen(PORT, () => console.log(`🎈 Bubble Boom chạy tại http://localhost:${PORT}`));

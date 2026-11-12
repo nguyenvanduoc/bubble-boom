@@ -7,7 +7,13 @@ export const TILE = 48;
 export const W = COLS * TILE, H = ROWS * TILE;
 
 const HAIR = { cap: '#5a3a2a', cloud: '#2f74d0', ears: '#8a5a2b', band: '#2d1b4e', bear: '#e4e4ee', bow: '#23865a' };
-const hash = (x, y) => { let h = x * 374761393 + y * 668265263; h = (h ^ (h >> 13)) * 1274126177; return ((h ^ (h >> 16)) >>> 0) / 4294967296; };
+// Số giả ngẫu nhiên cố định theo ô (x,y) -> mỗi ô luôn cùng một kiểu trang trí.
+// Math.imul = phép nhân số nguyên 32-bit, tránh tràn số làm mất tính ngẫu nhiên.
+const hash = (x, y) => {
+  let h = (Math.imul(x, 374761393) + Math.imul(y, 668265263)) | 0;
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+};
 
 function rr(ctx, x, y, w, h, r) {
   ctx.beginPath();
@@ -100,7 +106,8 @@ export function drawCharacter(ctx, charId, dir = 2, t = 0, moving = false) {
 }
 
 // ---------------- VẬT PHẨM ----------------
-const ITEM_COLORS = { bomb: '#2f8cff', range: '#22c3e6', speed: '#ffb21a', maxrange: '#a24bff', needle: '#8aa0b8', shield: '#ffcc33', kick: '#ff5a4f', mount: '#3ed37a' };
+const ITEM_COLORS = { bomb: '#2f8cff', range: '#22c3e6', speed: '#ffb21a', maxrange: '#a24bff', needle: '#8aa0b8', shield: '#ffcc33', kick: '#ff5a4f', mount: '#3ed37a',
+  boots: '#2f8cff', bag: '#ff7a2f', nozzle: '#22c3e6', glove: '#ffb21a', vest: '#ff5a4f' };
 function drawItemIcon(ctx, type) {
   switch (type) {
     case 'bomb':
@@ -139,6 +146,33 @@ function drawItemIcon(ctx, type) {
       ctx.fillStyle = '#3ed37a'; ctx.beginPath(); ctx.moveTo(-11, 8); ctx.quadraticCurveTo(-12, -11, 0, -11); ctx.quadraticCurveTo(12, -11, 11, 8); ctx.closePath(); ctx.fill();
       circ(ctx, -4, -2, 2.2, '#123'); circ(ctx, 4, -2, 2.2, '#123'); circ(ctx, -5, -6, 2, 'rgba(255,255,255,.7)');
       break;
+    // ----- trang bị cửa hàng -----
+    case 'boots':                                   // giày có cánh
+      ctx.fillStyle = '#2f8cff'; rr(ctx, -6, -11, 9, 16, 3); ctx.fill(); rr(ctx, -6, 0, 16, 7, 3); ctx.fill();
+      ctx.fillStyle = '#fff'; rr(ctx, -7, 6, 18, 3, 1.5); ctx.fill();
+      ctx.fillStyle = '#e8f6ff'; ctx.beginPath(); ctx.moveTo(-6, -8); ctx.quadraticCurveTo(-16, -12, -14, -2); ctx.quadraticCurveTo(-10, -6, -6, -3); ctx.fill();
+      break;
+    case 'bag':                                     // balo đựng bóng
+      ctx.fillStyle = '#ff7a2f'; rr(ctx, -9, -8, 18, 19, 6); ctx.fill();
+      ctx.fillStyle = '#d95a1a'; rr(ctx, -9, -8, 18, 8, 5); ctx.fill();
+      ctx.strokeStyle = '#d95a1a'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(0, -8, 5, Math.PI, 0); ctx.stroke();
+      circ(ctx, 0, 5, 4.5, '#2f8cff'); circ(ctx, -1.5, 3.5, 1.4, 'rgba(255,255,255,.8)');
+      break;
+    case 'nozzle':                                  // súng nước
+      ctx.fillStyle = '#ffb21a'; rr(ctx, -11, -4, 20, 8, 3); ctx.fill(); rr(ctx, -6, 2, 7, 10, 2); ctx.fill();
+      ctx.fillStyle = '#ff7a2f'; rr(ctx, 8, -2.5, 5, 5, 1.5); ctx.fill();
+      circ(ctx, -4, -8, 5, '#22c3e6'); circ(ctx, -5.5, -9.5, 1.5, 'rgba(255,255,255,.8)');
+      circ(ctx, 15, 0, 1.6, '#7fd8ff'); circ(ctx, 15, -4, 1.2, '#7fd8ff');
+      break;
+    case 'glove':                                   // găng vàng
+      circ(ctx, 1, 1, 8.5, '#ffb21a'); ctx.fillStyle = '#ffb21a'; rr(ctx, -9, -4, 7, 13, 3); ctx.fill();
+      ctx.fillStyle = '#fff'; rr(ctx, -3, 8, 12, 3, 1.5); ctx.fill(); star(ctx, 2, 0, 4, '#fff6a0');
+      break;
+    case 'vest':                                    // áo phao
+      ctx.fillStyle = '#ff5a4f'; ctx.beginPath(); ctx.moveTo(-10, -9); ctx.lineTo(-4, -11); ctx.lineTo(0, -6); ctx.lineTo(4, -11); ctx.lineTo(10, -9); ctx.lineTo(10, 11); ctx.lineTo(-10, 11); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.fillRect(-10, -1, 20, 3); ctx.fillRect(-10, 5, 20, 3);
+      ctx.fillStyle = '#1f2a44'; ctx.fillRect(-1, -6, 2, 17);
+      break;
   }
 }
 function star(ctx, x, y, r, fill) {
@@ -160,10 +194,25 @@ const THEMES = [
   { g1: '#93d46e', g2: '#88cb63', deco: '#6fb44c' },  // Làng Gió
   { g1: '#f3d593', g2: '#ecca7f', deco: '#d6ac62' },  // Sa Mạc
   { g1: '#ffe6f1', g2: '#ffd9ea', deco: '#ffb3d1' },  // Đảo Kẹo
+  { g1: '#c9965c', g2: '#c08d53', deco: '#9c6a3a' },  // Thuyền Chiến (sàn gỗ)
+  { g1: '#eaf6ff', g2: '#ddf0ff', deco: '#b9e0ff' },  // Băng Tuyết
+  { g1: '#6db35a', g2: '#64a952', deco: '#4f8f3f' },  // Rừng Nấm
 ];
+const WATER = '#3d9be0';
+
+/** Ô nước biển: nền xanh + sóng trắng nhỏ */
+function drawWater(ctx, x, y) {
+  const px = x * TILE, py = y * TILE, v = hash(x, y);
+  ctx.fillStyle = WATER; ctx.fillRect(px, py, TILE, TILE);
+  ctx.strokeStyle = 'rgba(255,255,255,.45)'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+  for (const [ox, oy] of [[8 + v * 10, 14], [22 - v * 8, 32]]) {
+    ctx.beginPath(); ctx.arc(px + ox, py + oy, 5, Math.PI * 1.1, Math.PI * 1.9); ctx.arc(px + ox + 9, py + oy, 5, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
+  }
+}
 
 function drawWall(ctx, x, y, theme) {
-  const px = x * TILE, py = y * TILE, v = hash(x, y);
+  const px = x * TILE, py = y * TILE;
+  const v = hash(x, y);
   ctx.save(); ctx.translate(px, py);
   ell(ctx, 24, 42, 20, 5, 'rgba(0,0,0,0.18)');
   if (theme === 0) {
@@ -186,6 +235,42 @@ function drawWall(ctx, x, y, theme) {
       ctx.fillStyle = '#b07a46'; rr(ctx, 3, 8, 42, 36, 12); ctx.fill();
       ctx.fillStyle = '#c99060'; rr(ctx, 6, 9, 34, 22, 10); ctx.fill();
       circ(ctx, 15, 16, 4, 'rgba(255,255,255,.2)');
+    }
+  } else if (theme === 3) {
+    if (v < 0.5) {           // đại bác
+      ctx.fillStyle = '#7a4f2a'; rr(ctx, 9, 28, 30, 11, 3); ctx.fill();
+      circ(ctx, 15, 40, 5.5, '#3b3b46'); circ(ctx, 33, 40, 5.5, '#3b3b46'); circ(ctx, 15, 40, 2, '#8a8a99'); circ(ctx, 33, 40, 2, '#8a8a99');
+      ctx.fillStyle = '#4a4a58'; rr(ctx, 6, 15, 34, 14, 7); ctx.fill();
+      circ(ctx, 40, 22, 7.5, '#5a5a6a'); circ(ctx, 40, 22, 4, '#1f1f26');
+      ctx.fillStyle = 'rgba(255,255,255,.2)'; rr(ctx, 10, 17, 22, 3, 1.5); ctx.fill();
+    } else {                 // cột buồm
+      ctx.fillStyle = '#7a4f2a'; rr(ctx, 21, 0, 6, 46, 2); ctx.fill();
+      ctx.fillStyle = '#fbf6ea'; ctx.beginPath(); ctx.moveTo(6, 6); ctx.lineTo(42, 6); ctx.quadraticCurveTo(38, 22, 42, 34); ctx.lineTo(6, 34); ctx.quadraticCurveTo(10, 22, 6, 6); ctx.fill();
+      ctx.fillStyle = '#e2574c'; ctx.fillRect(6, 17, 36, 5);
+      ctx.fillStyle = '#1f2a44'; ctx.beginPath(); ctx.moveTo(27, 0); ctx.lineTo(37, 3); ctx.lineTo(27, 6); ctx.fill();
+    }
+  } else if (theme === 4) {
+    if (v < 0.45) {          // người tuyết
+      circ(ctx, 24, 33, 12, '#ffffff'); circ(ctx, 24, 15, 9, '#ffffff');
+      circ(ctx, 21, 13, 1.6, '#1f2a44'); circ(ctx, 27, 13, 1.6, '#1f2a44');
+      ctx.fillStyle = '#ff8a1f'; ctx.beginPath(); ctx.moveTo(24, 16); ctx.lineTo(31, 18); ctx.lineTo(24, 19); ctx.fill();
+      ctx.fillStyle = '#e2574c'; rr(ctx, 15, 21, 18, 4, 2); ctx.fill(); rr(ctx, 27, 21, 4, 10, 2); ctx.fill();
+      ctx.fillStyle = '#1f2a44'; rr(ctx, 16, 2, 16, 5, 2); ctx.fill(); rr(ctx, 19, -4, 10, 8, 2); ctx.fill();
+    } else {                 // khối băng
+      ctx.fillStyle = '#7cc4f5'; rr(ctx, 4, 4, 40, 40, 8); ctx.fill();
+      ctx.fillStyle = '#a9dcff'; ctx.beginPath(); ctx.moveTo(8, 8); ctx.lineTo(40, 8); ctx.lineTo(24, 26); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,.8)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(12, 34); ctx.lineTo(20, 26); ctx.moveTo(30, 38); ctx.lineTo(38, 28); ctx.stroke();
+    }
+  } else if (theme === 5) {
+    if (v < 0.55) {          // nấm khổng lồ
+      ctx.fillStyle = '#f6e7cf'; rr(ctx, 17, 22, 14, 22, 5); ctx.fill();
+      ctx.fillStyle = ['#e2473d', '#9b5bff', '#ff8a1f'][(v * 5.4) | 0] || '#e2473d';
+      ctx.beginPath(); ctx.ellipse(24, 22, 21, 17, 0, Math.PI, 0); ctx.closePath(); ctx.fill();
+      for (const [dx, dy, r] of [[14, 14, 3.5], [27, 9, 3], [33, 17, 3], [21, 18, 2.2]]) circ(ctx, dx, dy, r, '#fff');
+    } else {                 // đá phủ rêu
+      ctx.fillStyle = '#8a8f99'; rr(ctx, 4, 9, 40, 35, 13); ctx.fill();
+      ctx.fillStyle = '#3f9b4a'; rr(ctx, 4, 9, 40, 12, 10); ctx.fill();
+      circ(ctx, 14, 30, 3, 'rgba(255,255,255,.15)');
     }
   } else {
     if (v < 0.4) {           // kẹo mút
@@ -215,6 +300,21 @@ function drawBox(ctx, x, y, theme, scale = 1, alpha = 1) {
     ctx.fillStyle = '#d9874f'; ctx.beginPath(); ctx.moveTo(14, 8); ctx.lineTo(34, 8); ctx.quadraticCurveTo(46, 26, 34, 43); ctx.lineTo(14, 43); ctx.quadraticCurveTo(2, 26, 14, 8); ctx.fill();
     ctx.fillStyle = '#b8683a'; rr(ctx, 12, 5, 24, 6, 3); ctx.fill();
     ctx.fillStyle = '#f2c38a'; ctx.fillRect(10, 22, 28, 4);
+  } else if (theme === 3) {                       // thùng rượu gỗ
+    ctx.fillStyle = '#a8693a'; rr(ctx, 9, 6, 30, 37, 12); ctx.fill();
+    ctx.fillStyle = '#6d6d78'; ctx.fillRect(9, 13, 30, 4); ctx.fillRect(9, 32, 30, 4);
+    ctx.fillStyle = 'rgba(0,0,0,.15)'; ctx.fillRect(18, 6, 2, 37); ctx.fillRect(28, 6, 2, 37);
+    ctx.fillStyle = 'rgba(255,255,255,.2)'; rr(ctx, 12, 8, 5, 30, 2.5); ctx.fill();
+  } else if (theme === 4) {                       // đống tuyết
+    ctx.fillStyle = '#cfe6f7'; rr(ctx, 5, 12, 38, 31, 14); ctx.fill();
+    ctx.fillStyle = '#ffffff'; rr(ctx, 5, 9, 38, 27, 13); ctx.fill();
+    star(ctx, 15, 18, 3.5, '#bfe3ff'); star(ctx, 32, 24, 2.5, '#bfe3ff');
+  } else if (theme === 5) {                       // gốc cây
+    ctx.fillStyle = '#7a4a24'; rr(ctx, 8, 16, 32, 27, 6); ctx.fill();
+    ell(ctx, 24, 16, 16, 7, '#d9a86c');
+    ctx.strokeStyle = '#a8713c'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.ellipse(24, 16, 10, 4, 0, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(24, 16, 4.5, 1.8, 0, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = '#5ea84d'; circ(ctx, 12, 40, 4, '#5ea84d'); circ(ctx, 37, 41, 3, '#5ea84d');
   } else {
     const c = ['#5ec8ff', '#ffcf4a', '#7be08f', '#ff8fb8'][(v * 4) | 0];
     ctx.fillStyle = c; rr(ctx, 5, 10, 38, 33, 6); ctx.fill();
@@ -236,7 +336,8 @@ export class Renderer {
     this.theme = 0; this.grid = ''; this.particles = []; this.shake = 0; this.breakStart = new Map(); this.drops = [];
   }
 
-  setTheme(theme) { this.theme = theme; this.grid = ''; }
+  /** Chọn bản đồ: lấy chủ đề màu + vị trí các ô nước '~' */
+  setMap(mapDef) { this.theme = mapDef.theme; this.rows = mapDef.rows; this.grid = ''; }
 
   /** Vẽ lại lớp nền tĩnh (cỏ, tường, thùng) khi lưới thay đổi */
   setGrid(grid) {
@@ -247,15 +348,23 @@ export class Renderer {
     const th = THEMES[this.theme];
     for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
       ctx.fillStyle = (x + y) % 2 ? th.g1 : th.g2; ctx.fillRect(x * TILE, y * TILE, TILE, TILE);
+      if (this.theme === 3) {                       // sàn tàu: ván gỗ + đinh
+        ctx.fillStyle = th.deco; ctx.fillRect(x * TILE, y * TILE + 15, TILE, 1.5); ctx.fillRect(x * TILE, y * TILE + 31, TILE, 1.5);
+        circ(ctx, x * TILE + 4, y * TILE + 8, 1.2, th.deco); circ(ctx, x * TILE + 44, y * TILE + 40, 1.2, th.deco);
+      }
+      if (this.rows && this.rows[y][x] === '~') { drawWater(ctx, x, y); continue; }
       const v = hash(x, y);
       if (v > 0.6) {
         ctx.fillStyle = th.deco;
         if (this.theme === 2) { circ(ctx, x * TILE + v * 40, y * TILE + (1 - v) * 40, 2, ['#ff8fb8', '#7cc8ff', '#ffd35c'][(v * 30) % 3 | 0]); }
-        else { ctx.fillRect(x * TILE + v * 36, y * TILE + 10 + v * 20, 2, 6); ctx.fillRect(x * TILE + v * 36 + 4, y * TILE + 12 + v * 20, 2, 4); }
+        else if (this.theme === 4) star(ctx, x * TILE + 8 + v * 30, y * TILE + 8 + (1 - v) * 30, 3, th.deco);
+        else if (this.theme === 5) { circ(ctx, x * TILE + v * 40, y * TILE + 12 + v * 20, 2.2, '#fff6a0'); circ(ctx, x * TILE + v * 40 + 5, y * TILE + 14 + v * 20, 2, '#ff9fc4'); }
+        else if (this.theme !== 3) { ctx.fillRect(x * TILE + v * 36, y * TILE + 10 + v * 20, 2, 6); ctx.fillRect(x * TILE + v * 36 + 4, y * TILE + 12 + v * 20, 2, 4); }
       }
     }
     for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
       const c = grid[y * COLS + x];
+      if (c === '#' && this.rows && this.rows[y][x] === '~') continue;   // nước đã vẽ ở lớp nền
       if (c === '#') drawWall(ctx, x, y, this.theme);
       else if (c === 'x') drawBox(ctx, x, y, this.theme);
     }
@@ -409,7 +518,7 @@ export class Renderer {
       ctx.strokeStyle = 'rgba(255,255,255,.8)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(0, 0, 29, 0, Math.PI * 2); ctx.stroke();
       ell(ctx, -11, -15, 6, 3.5, 'rgba(255,255,255,.8)');
       ctx.restore();
-      const k = p.trapLeft / TIMING.TRAP_TIME;                       // vòng đếm ngược vỡ bong bóng
+      const k = Math.min(1, p.trapLeft / TIMING.TRAP_TIME);         // vòng đếm ngược vỡ bong bóng
       ctx.strokeStyle = k < 0.35 ? '#ff4d5e' : '#ffffff'; ctx.lineWidth = 3.5; ctx.lineCap = 'round';
       ctx.beginPath(); ctx.arc(0, 0, 33, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * k); ctx.stroke();
     }
@@ -444,9 +553,10 @@ export function paintMapPreview(canvas, mapDef) {
   const ctx = canvas.getContext('2d');
   const s = 8; canvas.width = COLS * s; canvas.height = ROWS * s;
   const th = THEMES[mapDef.theme];
-  const wall = ['#e2574c', '#b07a46', '#b97ce8'][mapDef.theme], box = ['#c98b4b', '#d9874f', '#5ec8ff'][mapDef.theme];
+  const wall = ['#e2574c', '#b07a46', '#b97ce8', '#4a4a58', '#7cc4f5', '#e2473d'][mapDef.theme];
+  const box = ['#c98b4b', '#d9874f', '#5ec8ff', '#a8693a', '#ffffff', '#7a4a24'][mapDef.theme];
   mapDef.rows.forEach((row, y) => [...row].forEach((c, x) => {
-    ctx.fillStyle = c === '#' ? wall : c === '?' || c === 'x' ? box : (x + y) % 2 ? th.g1 : th.g2;
+    ctx.fillStyle = c === '~' ? WATER : c === '#' ? wall : c === '?' || c === 'x' ? box : (x + y) % 2 ? th.g1 : th.g2;
     if (c === '?') ctx.globalAlpha = 0.55;
     ctx.fillRect(x * s, y * s, s, s); ctx.globalAlpha = 1;
   }));

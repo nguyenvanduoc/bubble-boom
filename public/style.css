@@ -133,7 +133,7 @@ kbd { font: inherit; font-weight: 700; padding: 0 6px; border-radius: 6px; backg
 .slot select { flex: none; padding: 2px 6px; font-size: .85rem; border-radius: 8px; width: 100%; }
 .badge { font-size: .75rem; font-weight: 700; padding: 0 8px; border-radius: 999px; background: var(--line); }
 .badge.ok { background: #2fc46b; color: #fff; }
-.map-list { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.map-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
 .map-card { font: inherit; color: var(--text); padding: 6px; border-radius: 12px; border: 3px solid transparent; background: var(--input); cursor: pointer; }
 .map-card.sel { border-color: var(--primary); }
 .map-card:disabled { cursor: default; }
@@ -141,6 +141,23 @@ kbd { font: inherit; font-weight: 700; padding: 0 6px; border-radius: 6px; backg
 .map-card span { font-size: .85rem; font-weight: 700; }
 .chat-log { height: 150px; overflow-y: auto; font-size: .9rem; margin-bottom: 8px; display: flex; flex-direction: column; gap: 2px; }
 .chat-log b { color: var(--accent); }
+
+/* ---------- cửa hàng ---------- */
+.shop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+.shop-card {
+  display: grid; grid-template-columns: auto 1fr; gap: 6px 10px; align-items: center; padding: 10px;
+  border-radius: 16px; background: var(--input); border: 3px solid transparent;
+}
+.shop-card.worn { border-color: #2fc46b; }
+.shop-card .info > b { display: block; font-size: 1.05rem; }
+.shop-card .info small { display: block; color: var(--muted); line-height: 1.25; }
+.shop-card .have { font-size: .85rem; }
+.shop-card .acts { grid-column: 1 / -1; display: flex; gap: 6px; flex-wrap: wrap; }
+.shop-card .acts .btn { flex: 1; }
+.coins { font-weight: 800; }
+.toggle { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-weight: 600; cursor: pointer; }
+.toggle input { flex: none; width: 20px; height: 20px; accent-color: var(--primary); }
+.gear-row { display: flex; gap: 2px; min-height: 22px; }
 
 /* ---------- trong trận ---------- */
 #scr-game.active { display: flex; flex-direction: column; align-items: center; gap: 8px; }

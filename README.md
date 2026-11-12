@@ -14,6 +14,30 @@ npm start          # mở http://localhost:3000
 - **Chơi mạng LAN:** bạn bè mở `http://<IP-máy-bạn>:3000`.
 - **Kết nối tới server khác:** thêm tham số vào link, ví dụ `index.html?server=wss://ten-mien/ws`.
 
+## Cửa hàng & ví xu
+
+- Người mới được tặng **300 xu**. Sau mỗi trận được thưởng: +20 xu khi tham gia, +60 khi thắng, +15 cho mỗi đối thủ hạ được, +1 cho mỗi thùng phá được.
+- **Vật phẩm mang vào trận:**
+  - Kim Bạc (40 xu): mang tối đa 3 cây mỗi trận.
+  - Khiên Sao (60 xu): mang tối đa 2 cái mỗi trận.
+  - Món nào dùng không hết sẽ được hoàn lại vào kho sau trận.
+- **Trang bị:** mua một lần dùng mãi, mặc tối đa 2 món cùng lúc.
+  - Giày Lướt Sóng: +1 tốc độ khi vào trận.
+  - Balo Bóng: +1 bóng nước khi vào trận.
+  - Vòi Rồng: +1 tầm nổ khi vào trận.
+  - Găng Thần: vào trận có sẵn Găng Đẩy bóng.
+  - Áo Phao: bong bóng giữ lâu thêm 1,5 giây.
+  - Chỉ số cộng thêm không vượt giới hạn tối đa của nhân vật.
+- Chủ phòng có thể **tắt trang bị** để mọi người đấu công bằng.
+- **Ví online** lưu trên server ở file `data/profiles.json`, gắn với trình duyệt qua một mã (token) trong localStorage. Có thể đổi chỗ lưu bằng biến `DATA_FILE`.
+- **Ví offline** (chơi với bot) lưu riêng trong trình duyệt.
+- Một số dịch vụ miễn phí (ví dụ Render bản free) xoá ổ đĩa mỗi lần khởi động lại. Khi đó cần gắn ổ đĩa lưu trữ (persistent disk) để giữ ví.
+
+## Bản đồ (8 bản đồ)
+
+Làng Gió · Sa Mạc Cát · Đảo Kẹo · **Thuyền Chiến** · **Hải Chiến Hai Tàu** · **Băng Tuyết** · **Rừng Nấm** · **Quảng Trường**.
+Ký hiệu trong `constants.js`: `#` tường, `~` nước biển, `?` có thể là thùng, `x` chắc chắn là thùng, `.` ô trống, `1`–`6` điểm xuất phát.
+
 ## Đưa lên mạng (miễn phí / rẻ)
 
 Bất kỳ dịch vụ nào hỗ trợ **Node.js + WebSocket** đều dùng được, ví dụ Render, Railway hay Fly.io.
@@ -43,10 +67,12 @@ Bất kỳ dịch vụ nào hỗ trợ **Node.js + WebSocket** đều dùng đư
 
 ```
 server.js                 HTTP tĩnh + WebSocket
+profile-store.js          Lưu ví xu của người chơi ra file JSON
 public/
   index.html, style.css   Giao diện
   shared/                 DÙNG CHUNG server & trình duyệt
-    constants.js          Thông số, nhân vật, vật phẩm, bản đồ
+    constants.js          Thông số, nhân vật, vật phẩm, cửa hàng, bản đồ
+    profile.js            Ví xu: mua, mặc trang bị, mang đồ vào trận, thưởng
     engine.js             Luật game: di chuyển, nổ, nhốt, thắng thua
     bot.js                AI bot
     rooms.js              Sảnh + phòng + vòng lặp 30 tick/giây

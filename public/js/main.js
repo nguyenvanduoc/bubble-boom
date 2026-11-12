@@ -1,7 +1,7 @@
 // ============================================================
 // CLIENT: giao diện, kết nối, dự đoán chuyển động & nội suy
 // ============================================================
-import { TICK_MS, TIMING, CHARACTERS, CHAR_BY_ID, MAPS, MAP_BY_ID, TEAMS, ITEMS, MAX_PLAYERS } from '../shared/constants.js';
+import { TICK_MS, TIMING, CHARACTERS, CHAR_BY_ID, MAPS, MAP_BY_ID, TEAMS, ITEMS, MAX_PLAYERS, SHOP, MAX_EQUIP, REWARD } from '../shared/constants.js';
 import { movePlayer, speedOf, decodePlayer, decodeBomb, decodeFlame } from '../shared/engine.js';
 import { Renderer, paintCharPreview, paintMapPreview, drawItem, TILE } from './render.js';
 import { Input } from './input.js';
@@ -20,6 +20,7 @@ const S = {
   conn: null, myId: null, offline: false,
   name: store.get('bb-name', ''), charId: store.get('bb-char', 'bin'),
   room: null, lobby: null, game: null, pendingJoin: params.get('room'), offlineSetup: false, ping: 0,
+  profile: null, shopBack: 'scr-lobby',
 };
 if (!CHAR_BY_ID[S.charId]) S.charId = 'bin';
 
@@ -28,6 +29,7 @@ const input = new Input();
 input.bindTouch($('#touch'));
 
 // ---------------- tiện ích giao diện ----------------
+const currentScreen = () => document.querySelector('.screen.active')?.id;
 function show(id) {
   document.querySelectorAll('.screen').forEach((s) => s.classList.toggle('active', s.id === id));
   input.enabled = id === 'scr-game';
@@ -163,13 +165,16 @@ function renderRoom() {
       <canvas></canvas>
       <div class="nm">${esc(m.name)}${m.id === S.myId ? ' (bạn)' : ''}</div>
       <select ${canEditTeam ? '' : 'disabled'}>${TEAMS.map((t, ti) => `<option value="${ti}" ${ti === m.team ? 'selected' : ''}>Đội ${t.name}</option>`).join('')}</select>
-      ${m.id === r.host || m.bot ? '' : `<span class="badge ${m.ready ? 'ok' : ''}">${m.ready ? 'Sẵn sàng' : 'Chưa sẵn sàng'}</span>`}`;
+      ${m.id === r.host || m.bot ? '' : `<span class="badge ${m.ready ? 'ok' : ''}">${m.ready ? 'Sẵn sàng' : 'Chưa sẵn sàng'}</span>`}
+      <div class="gear-row"></div>`;
     paintCharPreview(el.querySelector('canvas'), m.charId);
+    if (r.gear) for (const g of m.gear || []) { const c = itemCanvas(SHOP[g].icon, 22); c.title = SHOP[g].name; el.querySelector('.gear-row').appendChild(c); }
     el.querySelector('select').onchange = (e) => S.conn.send({ t: 'team', team: +e.target.value, id: m.id });
     el.querySelector('.kick')?.addEventListener('click', () => S.conn.send({ t: 'kick', id: m.id }));
     slots.appendChild(el);
   }
   $('#btn-addbot').style.display = host ? '' : 'none';
+  $('#gear-toggle').checked = r.gear; $('#gear-toggle').disabled = !host;
   const me = r.members.find((m) => m.id === S.myId);
   $('#btn-ready').textContent = host ? '▶ Bắt đầu' : me?.ready ? 'Huỷ sẵn sàng' : 'Sẵn sàng';
   // bản đồ
@@ -204,12 +209,68 @@ function addChat(from, text) {
   }
 }
 
+// ---------------- CỬA HÀNG ----------------
+$('#gear-toggle').onchange = (e) => S.conn.send({ t: 'gear', v: e.target.checked });
+document.querySelectorAll('[data-shop]').forEach((b) => { b.onclick = openShop; });
+$('#shop-back').onclick = () => {
+  const back = S.shopBack === 'scr-room' && !S.room ? (S.offline ? 'scr-home' : 'scr-lobby') : S.shopBack;
+  show(back);
+};
+function openShop() {
+  if (!S.profile) return toast('Đang tải ví xu, thử lại sau giây lát');
+  S.shopBack = currentScreen();
+  renderShop();
+  show('scr-shop');
+}
+function updateCoins() {
+  document.querySelectorAll('.coins').forEach((el) => { el.textContent = `🪙 ${S.profile ? S.profile.coins : 0}`; });
+}
+function renderShop() {
+  const P = S.profile; if (!P) return;
+  updateCoins();
+  const cons = $('#shop-consumables'), gear = $('#shop-gear');
+  cons.innerHTML = ''; gear.innerHTML = '';
+  for (const [id, it] of Object.entries(SHOP)) {
+    const card = document.createElement('div');
+    card.className = 'shop-card';
+    card.appendChild(itemCanvas(it.icon, 52));
+    const info = document.createElement('div'); info.className = 'info';
+    const acts = document.createElement('div'); acts.className = 'acts';
+    const btn = (label, cost, onClick, primary = true) => {
+      const b = document.createElement('button');
+      b.className = 'btn small' + (primary ? ' primary' : ''); b.textContent = label;
+      b.disabled = cost > P.coins; b.onclick = onClick; acts.appendChild(b);
+    };
+    if (it.kind === 'consumable') {
+      info.innerHTML = `<b>${it.name}</b><small>${it.desc}</small><span class="have">Trong kho: <b>${P.inv[id]}</b> · mang tối đa ${it.carry}/trận</span>`;
+      btn(`Mua 1 · ${it.price}🪙`, it.price, () => S.conn.send({ t: 'buy', item: id, qty: 1 }));
+      btn(`Mua 5 · ${it.price * 5}🪙`, it.price * 5, () => S.conn.send({ t: 'buy', item: id, qty: 5 }), false);
+      cons.appendChild(card);
+    } else {
+      const owned = P.owned.includes(id), worn = P.equipped.includes(id);
+      card.classList.toggle('worn', worn);
+      info.innerHTML = `<b>${it.name}</b><small>${it.desc}</small><span class="have">${worn ? '✅ Đang mặc' : owned ? 'Đã có' : 'Chưa có'}</span>`;
+      if (!owned) btn(`Mua · ${it.price}🪙`, it.price, () => S.conn.send({ t: 'buy', item: id }));
+      else btn(worn ? 'Tháo ra' : 'Mặc vào', 0, () => S.conn.send({ t: 'equip', item: id, on: !worn }), !worn);
+      gear.appendChild(card);
+    }
+    card.append(info, acts);
+  }
+  $('#equip-count').textContent = `(đang mặc ${P.equipped.length}/${MAX_EQUIP})`;
+  $('#shop-earn').innerHTML = `
+    <div>🎮 Mỗi trận: <b>+${REWARD.play}</b></div><div>🏆 Thắng: <b>+${REWARD.win}</b></div>
+    <div>💥 Hạ 1 đối thủ: <b>+${REWARD.kill}</b></div><div>📦 Phá 1 thùng: <b>+${REWARD.box}</b></div>`;
+  $('#wallet-note').textContent = S.offline
+    ? 'Bạn đang chơi offline: ví này lưu trong trình duyệt, tách riêng với ví online.'
+    : `Ví online lưu trên server, gắn với trình duyệt này. Đã chơi ${P.games} trận, thắng ${P.wins}.`;
+}
+
 // ---------------- NHẬN TIN TỪ SERVER ----------------
 function onMsg(m) {
   switch (m.t) {
     case 'welcome':
       S.myId = m.id;
-      S.conn.send({ t: 'hello', name: S.name, char: S.charId });
+      S.conn.send({ t: 'hello', name: S.name, char: S.charId, token: store.get('bb-token', '') });
       if (S.offline) S.conn.send({ t: 'create', name: 'Luyện tập với bot', map: MAPS[0].id });
       break;
     case 'lobby':
@@ -217,14 +278,19 @@ function onMsg(m) {
       if (!S.offline) S.room = null;   // server chỉ gửi danh sách sảnh cho người KHÔNG ở trong phòng
       if (!S.offline && !S.room) {
         if (S.pendingJoin) { S.conn.send({ t: 'join', room: S.pendingJoin }); S.pendingJoin = null; }
-        if (!S.game) show('scr-lobby');
+        if (currentScreen() === 'scr-shop') S.shopBack = 'scr-lobby';   // đang ở cửa hàng thì không kéo ra
+        else if (!S.game) show('scr-lobby');
       }
       renderLobby();
       break;
     case 'room':
       S.room = m.room;
       if (S.offlineSetup) { S.offlineSetup = false; for (let i = 0; i < 3; i++) S.conn.send({ t: 'addBot' }); }
-      if (m.room.status === 'waiting' && (!S.game || S.game.ended)) { endGameView(); show('scr-room'); }
+      if (m.room.status === 'waiting' && (!S.game || S.game.ended)) {
+        const fromGame = !!S.game;
+        endGameView();
+        if (fromGame || currentScreen() !== 'scr-shop') show('scr-room'); else S.shopBack = 'scr-room';
+      }
       renderRoom();
       break;
     case 'start': startGame(m); break;
@@ -232,6 +298,13 @@ function onMsg(m) {
     case 'end': showResult(m.result); break;
     case 'chat': addChat(m.from, m.text); break;
     case 'err': toast(m.msg); break;
+    case 'profile':
+      S.profile = m.profile;
+      if (m.token) store.set('bb-token', m.token);
+      updateCoins();
+      if (currentScreen() === 'scr-shop') renderShop();
+      if (m.msg) { toast(m.msg); sfx.pick(); }
+      break;
     case 'pong': S.ping = Math.round(performance.now() - m.c); break;
   }
 }
@@ -251,7 +324,7 @@ function startGame(m) {
     pred: null, prev: null, corr: { x: 0, y: 0 }, me: null, myDir: 2, myMoving: false,
     acc: 0, phase: 'countdown', ended: false, lastCount: -1, goAt: 0,
   };
-  renderer.setTheme(MAP_BY_ID[m.map].theme);
+  renderer.setMap(MAP_BY_ID[m.map]);
   renderer.particles = [];
   $('#result').classList.add('hidden');
   $('#game-chat').innerHTML = '';
@@ -427,7 +500,7 @@ function showResult(res) {
   (res.draw ? sfx.lose : win ? sfx.win : sfx.lose)();
   const title = res.draw ? ['HOÀ!', 'draw'] : win ? ['CHIẾN THẮNG!', 'win'] : ['THUA RỒI!', 'lose'];
   const rows = [...res.stats].sort((a, b) => res.winners.includes(b.id) - res.winners.includes(a.id) || b.kills - a.kills)
-    .map((s) => `<tr><td><span style="color:${TEAMS[s.team].color}">●</span> ${esc(s.name)}${s.id === S.myId ? ' (bạn)' : ''}</td><td>${res.winners.includes(s.id) ? '🏆' : ''}</td><td>${s.kills} hạ</td></tr>`).join('');
+    .map((s) => `<tr><td><span style="color:${TEAMS[s.team].color}">●</span> ${esc(s.name)}${s.id === S.myId ? ' (bạn)' : ''}</td><td>${res.winners.includes(s.id) ? '🏆' : ''}</td><td>${s.kills} hạ</td><td>${res.coins?.[s.id] != null ? `+${res.coins[s.id]} 🪙` : ''}</td></tr>`).join('');
   const r = $('#result');
   r.innerHTML = `<div class="card"><h2 class="${title[1]}">${title[0]}</h2>
     <div class="muted">${res.draw ? 'Không đội nào trụ lại' : `Đội ${TEAMS[res.team].name} thắng`}</div>

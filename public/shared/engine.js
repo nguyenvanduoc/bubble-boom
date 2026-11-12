@@ -31,7 +31,7 @@ export function buildMap(mapDef, rng = Math.random) {
     for (let x = 0; x < COLS; x++) {
       const ch = mapDef.rows[y][x];
       const i = idx(x, y);
-      if (ch === '#') grid[i] = '#';
+      if (ch === '#' || ch === '~') grid[i] = '#';          // '~' nước biển = chặn như tường
       else if (ch === 'x' || (ch === '?' && rng() < BOX_DENSITY)) grid[i] = 'x';
       else if (ch >= '1' && ch <= '6') spawns[ch] = { x, y };
       if (grid[i] === 'x' && rng() < ITEM_CHANCE) hidden.set(i, randomItemCh(rng));
@@ -135,7 +135,7 @@ export const decodeFlame = (a) => ({ x: a[0], y: a[1], k: a[2], d: a[3], left: a
 //                         LỚP GAME
 // ============================================================
 export class Game {
-  /** players: [{ id, name, charId, team, bot }] */
+  /** players: [{ id, name, charId, team, bot, loadout? }] - loadout lấy từ cửa hàng (profile.js) */
   constructor({ mapId, players, rng = Math.random }) {
     this.map = MAP_BY_ID[mapId] || MAPS[0];
     this.rng = rng;
@@ -158,11 +158,17 @@ export class Game {
     players.forEach((info, i) => {
       const sp = spawns[SPAWN_ORDER[i]] || spawns['1'];
       const ch = CHAR_BY_ID[info.charId] || CHARACTERS[0];
+      const lo = info.loadout || {};
+      const bon = lo.bonus || {};
       this.players.set(info.id, {
         id: info.id, name: info.name, charId: ch.id, team: info.team, bot: !!info.bot,
         x: sp.x, y: sp.y, dir: 2, moving: false,
-        maxBombs: ch.b[0], range: ch.r[0], speedLv: ch.s[0],
-        needles: 0, shields: 0, kick: false, mount: false,
+        // chỉ số khởi đầu = nhân vật + trang bị, nhưng không vượt giới hạn của nhân vật
+        maxBombs: Math.min(ch.b[0] + (bon.b | 0), ch.b[1]),
+        range: Math.min(ch.r[0] + (bon.r | 0), ch.r[1]),
+        speedLv: Math.min(ch.s[0] + (bon.s | 0), ch.s[1]),
+        needles: lo.needles | 0, shields: lo.shields | 0, kick: !!lo.kick, mount: false,
+        trapBonus: lo.trapBonus | 0, gear: lo.gear || [], boxes: 0,
         state: 'alive', trapUntil: 0, trappedBy: null, invulnUntil: 0, shieldUntil: 0,
         kills: 0, ack: 0, queue: [], budget: 0, deadAt: 0, ai: {},
       });
@@ -361,6 +367,8 @@ export class Game {
         if (c === 'x') {                         // thùng: tia dừng lại, thùng bắt đầu vỡ
           this.grid[k] = 'y'; this.gridVersion++;
           this.breaking.push({ i: k, at: now + TIMING.BOX_BREAK_TIME });
+          const owner = this.players.get(b.owner);
+          if (owner) owner.boxes++;                // đếm thùng phá được -> thưởng xu
           break;
         }
         const other = this.bombAt(x, y);
@@ -385,7 +393,7 @@ export class Game {
       this.events.push({ k: 'unmount', id: p.id });
       return;
     }
-    p.state = 'trapped'; p.trapUntil = now + TIMING.TRAP_TIME; p.trappedBy = ownerId; p.moving = false;
+    p.state = 'trapped'; p.trapUntil = now + TIMING.TRAP_TIME + p.trapBonus; p.trappedBy = ownerId; p.moving = false;
     this.events.push({ k: 'trap', id: p.id });
   }
 
@@ -435,7 +443,7 @@ export class Game {
       draw: team === null,
       team,
       winners: team === null ? [] : players.filter((p) => p.team === team).map((p) => p.id),
-      stats: players.map((p) => ({ id: p.id, name: p.name, team: p.team, kills: p.kills, alive: p.state !== 'dead' })),
+      stats: players.map((p) => ({ id: p.id, name: p.name, team: p.team, kills: p.kills, boxes: p.boxes, bot: p.bot, alive: p.state !== 'dead' })),
     };
     this.events.push({ k: 'end' });
   }

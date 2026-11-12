@@ -5,16 +5,21 @@
 import { TICK_MS, TIMING, MAX_PLAYERS, CHARACTERS, CHAR_BY_ID, MAPS, MAP_BY_ID, TEAMS } from './constants.js';
 import { Game } from './engine.js';
 import { thinkBot } from './bot.js';
+import { MemoryStore, buy, equip, takeLoadout, settle } from './profile.js';
 
 const BOT_NAMES = ['Bot Mít', 'Bot Ổi', 'Bot Chuối', 'Bot Na', 'Bot Xoài', 'Bot Dừa', 'Bot Me'];
 const clean = (s, n) => String(s ?? '').replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, n);
+const TOKEN_RE = /^[A-Za-z0-9_-]{16,64}$/;
+const genToken = () => Array.from({ length: 32 }, () => 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'[(Math.random() * 62) | 0]).join('');
 const nowMs = () => (globalThis.performance ? performance.now() : Date.now());
 
 export class Lobby {
-  constructor() {
+  /** store: nơi lưu hồ sơ { get(token), save() } - server lưu file, offline lưu trình duyệt */
+  constructor(store = new MemoryStore()) {
     this.clients = new Map();
     this.rooms = new Map();
     this.seq = 1;
+    this.store = store;
   }
 
   // ---------- kết nối ----------
@@ -38,18 +43,35 @@ export class Lobby {
       case 'hello':
         c.name = clean(m.name, 16) || 'Khách';
         if (CHAR_BY_ID[m.char]) c.charId = m.char;
+        // token = "chìa khoá" của ví xu, client lưu lại để lần sau dùng tiếp
+        c.token = TOKEN_RE.test(m.token) ? m.token : genToken();
+        c.profile = this.store.get(c.token);
+        this.sendProfile(c);
         c.send(this.lobbyMsg());
+        break;
+      case 'buy': case 'equip': {
+        if (!c.profile) return;
+        const err = m.t === 'buy' ? buy(c.profile, m.item, m.qty) : equip(c.profile, m.item, !!m.on);
+        if (err) return c.send({ t: 'err', msg: err });
+        this.store.save();
+        this.sendProfile(c, m.t === 'buy' ? 'Mua thành công!' : null);
+        const me = room && room.status === 'waiting' && room.members.find((x) => x.id === c.id);
+        if (me) { me.gear = [...c.profile.equipped]; this.sendRoom(room); }
+        break;
+      }
+      case 'gear':
+        if (isHost && room.status === 'waiting') { room.gear = !!m.v; this.sendRoom(room); }
         break;
       case 'list': c.send(this.lobbyMsg()); break;
       case 'create': {
         this.leave(c);
         const r = {
           id: this.newCode(), name: clean(m.name, 24) || `Phòng của ${c.name}`,
-          host: c.id, mapId: MAP_BY_ID[m.map] ? m.map : MAPS[0].id,
+          host: c.id, mapId: MAP_BY_ID[m.map] ? m.map : MAPS[0].id, gear: true,
           members: [], status: 'waiting', game: null, loop: null, timers: [],
         };
         this.rooms.set(r.id, r);
-        this.addMember(r, { id: c.id, name: c.name, charId: c.charId, bot: false });
+        this.addMember(r, this.memberOf(c));
         c.room = r.id;
         this.sendRoom(r); this.pushLobby();
         break;
@@ -61,7 +83,7 @@ export class Lobby {
         if (r.members.length >= MAX_PLAYERS) return c.send({ t: 'err', msg: 'Phòng đã đầy' });
         if (c.room !== r.id) {
           this.leave(c);
-          this.addMember(r, { id: c.id, name: c.name, charId: c.charId, bot: false });
+          this.addMember(r, this.memberOf(c));
           c.room = r.id;
         }
         this.sendRoom(r); this.pushLobby();
@@ -130,6 +152,14 @@ export class Lobby {
     return code;
   }
 
+  memberOf(c) {
+    return { id: c.id, name: c.name, charId: c.charId, bot: false, gear: c.profile ? [...c.profile.equipped] : [] };
+  }
+
+  sendProfile(c, msg) {
+    if (c.profile) c.send({ t: 'profile', token: c.token, profile: c.profile, msg });
+  }
+
   addMember(r, m) {
     const used = new Set(r.members.map((x) => x.team));
     m.team = TEAMS.findIndex((_, i) => !used.has(i));
@@ -165,7 +195,16 @@ export class Lobby {
     const notReady = r.members.filter((m) => !m.bot && m.id !== r.host && !m.ready);
     if (notReady.length) return err(`Chưa sẵn sàng: ${notReady.map((m) => m.name).join(', ')}`);
 
-    const game = new Game({ mapId: r.mapId, players: r.members.map((m) => ({ ...m })) });
+    // Lấy vật phẩm + trang bị từ kho của từng người (nếu chủ phòng cho phép)
+    r.loadouts = new Map();
+    const players = r.members.map((m) => {
+      const info = { ...m };
+      const cl = !m.bot && r.gear && this.clients.get(m.id);
+      if (cl && cl.profile) { info.loadout = takeLoadout(cl.profile); r.loadouts.set(m.id, info.loadout); this.sendProfile(cl); }
+      return info;
+    });
+    this.store.save();
+    const game = new Game({ mapId: r.mapId, players });
     r.game = game; r.status = 'playing'; r.lastGv = game.gridVersion; r.ended = false;
     this.broadcast(r, { t: 'start', map: r.mapId, players: game.infoList(), g: game.grid.join(''), gv: game.gridVersion });
     this.pushLobby();
@@ -191,7 +230,17 @@ export class Lobby {
     if (g.phase === 'end' && !r.ended) {
       r.ended = true;
       clearInterval(r.loop);
+      // Thưởng xu + hoàn vật phẩm chưa dùng cho người còn ở trong phòng
+      const coins = {};
+      for (const m of r.members) {
+        const cl = !m.bot && this.clients.get(m.id), gp = g.players.get(m.id);
+        if (!cl || !cl.profile || !gp) continue;
+        coins[m.id] = settle(cl.profile, r.loadouts.get(m.id), gp, g.result.winners.includes(m.id));
+      }
+      g.result.coins = coins;
+      this.store.save();
       this.broadcast(r, { t: 'end', result: g.result });
+      for (const id in coins) this.sendProfile(this.clients.get(id));
       r.timers.push(setTimeout(() => {
         r.game = null; r.status = 'waiting';
         r.members.forEach((m) => { if (!m.bot) m.ready = false; });
@@ -209,8 +258,8 @@ export class Lobby {
   sendRoom(r) {
     this.broadcast(r, {
       t: 'room',
-      room: { id: r.id, name: r.name, host: r.host, map: r.mapId, status: r.status,
-        members: r.members.map(({ id, name, charId, team, ready, bot }) => ({ id, name, charId, team, ready, bot })) },
+      room: { id: r.id, name: r.name, host: r.host, map: r.mapId, status: r.status, gear: r.gear,
+        members: r.members.map(({ id, name, charId, team, ready, bot, gear }) => ({ id, name, charId, team, ready, bot, gear: gear || [] })) },
     });
   }
 

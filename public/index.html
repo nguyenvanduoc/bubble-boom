@@ -48,6 +48,8 @@
       <button class="btn ghost" id="lobby-back">← Về</button>
       <h2>Sảnh chờ</h2>
       <span id="online-count" class="pill"></span>
+      <span class="pill coins">🪙 0</span>
+      <button class="btn primary small" data-shop>🛒 Cửa hàng</button>
     </div>
     <div class="panel">
       <h3>Tạo phòng mới</h3>
@@ -73,6 +75,8 @@
       <button class="btn ghost" id="room-leave">← Rời phòng</button>
       <h2 id="room-title"></h2>
       <button id="room-copy" class="pill" title="Sao chép link mời">Mã <b id="room-code"></b> 📋</button>
+      <span class="pill coins">🪙 0</span>
+      <button class="btn primary small" data-shop>🛒 Cửa hàng</button>
     </div>
     <div class="room-grid">
       <div class="panel">
@@ -82,6 +86,7 @@
           <button id="btn-addbot" class="btn">+ Thêm bot</button>
           <button id="btn-ready" class="btn primary big">Sẵn sàng</button>
         </div>
+        <label class="toggle"><input type="checkbox" id="gear-toggle"> <span>Cho phép mang trang bị &amp; vật phẩm từ cửa hàng (chủ phòng chọn)</span></label>
         <p class="muted small">Cùng màu đội = đồng đội (chạm để cứu nhau). Khác màu = đối thủ.</p>
       </div>
       <div class="side">
@@ -92,6 +97,30 @@
           <form id="chat-form" class="row gap"><input id="chat-in" maxlength="120" placeholder="Nhắn gì đó..." autocomplete="off"><button class="btn">Gửi</button></form>
         </div>
       </div>
+    </div>
+  </section>
+
+  <!-- ============ CỬA HÀNG ============ -->
+  <section id="scr-shop" class="screen">
+    <div class="topbar">
+      <button class="btn ghost" id="shop-back">← Quay lại</button>
+      <h2>🛒 Cửa hàng</h2>
+      <span class="pill coins">🪙 0</span>
+    </div>
+    <div class="panel">
+      <h3>Vật phẩm mang vào trận</h3>
+      <p class="muted small">Khi bắt đầu trận, game tự lấy từ kho tối đa 3 Kim và 2 Khiên. Dùng không hết sẽ được hoàn lại sau trận.</p>
+      <div id="shop-consumables" class="shop-grid"></div>
+    </div>
+    <div class="panel">
+      <h3>Trang bị <span id="equip-count" class="muted small"></span></h3>
+      <p class="muted small">Mua một lần dùng mãi. Mặc tối đa 2 món, cộng chỉ số khi vào trận (không vượt giới hạn của nhân vật).</p>
+      <div id="shop-gear" class="shop-grid"></div>
+    </div>
+    <div class="panel">
+      <h3>Cách kiếm xu</h3>
+      <div id="shop-earn" class="keys"></div>
+      <p id="wallet-note" class="muted small"></p>
     </div>
   </section>
 

@@ -3,6 +3,16 @@
 // Cả hai trả về cùng 1 giao diện { send(obj), close(), offline }
 // ============================================================
 import { Lobby } from '../shared/rooms.js';
+import { newProfile, fixProfile } from '../shared/profile.js';
+
+/** Ví xu chế độ offline: lưu trong localStorage của trình duyệt (riêng với ví online trên server) */
+class LocalStore {
+  constructor() {
+    try { this.data = JSON.parse(localStorage.getItem('bb-offline-wallet')) || {}; } catch { this.data = {}; }
+  }
+  get(token) { return fixProfile(this.data[token] || (this.data[token] = newProfile())); }
+  save() { try { localStorage.setItem('bb-offline-wallet', JSON.stringify(this.data)); } catch { /* chế độ riêng tư */ } }
+}
 
 export function connectOnline(url, onMsg, onClose) {
   return new Promise((resolve, reject) => {
@@ -23,7 +33,7 @@ export function connectOnline(url, onMsg, onClose) {
 }
 
 export function connectOffline(onMsg) {
-  const lobby = new Lobby();
+  const lobby = new Lobby(new LocalStore());
   // queueMicrotask: giao tin nhắn bất đồng bộ giống mạng thật, tránh gọi lồng nhau
   const client = lobby.connect((m) => queueMicrotask(() => onMsg(typeof m === 'string' ? JSON.parse(m) : m)));
   return {
