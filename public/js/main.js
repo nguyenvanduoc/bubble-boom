@@ -1,9 +1,9 @@
 // ============================================================
 // CLIENT: giao diện, kết nối, dự đoán chuyển động & nội suy
 // ============================================================
-import { TICK_MS, TIMING, CHARACTERS, CHAR_BY_ID, MAPS, MAP_BY_ID, TEAMS, ITEMS, MAX_PLAYERS, SHOP, MAX_EQUIP, REWARD } from '../shared/constants.js';
-import { movePlayer, speedOf, decodePlayer, decodeBomb, decodeFlame } from '../shared/engine.js';
-import { Renderer, paintCharPreview, paintMapPreview, drawItem, TILE } from './render.js';
+import { TICK_MS, TIMING, CHARACTERS, CHAR_BY_ID, MAPS, MAP_BY_ID, TEAMS, ITEMS, MAX_PLAYERS, SHOP, SHOP_TABS, ITEM_IDS, MAX_EQUIP, REWARD } from '../shared/constants.js';
+import { movePlayer, speedOf, decodePlayer, decodeBomb, decodeFlame, decodeDart } from '../shared/engine.js';
+import { Renderer, paintCharPreview, paintMapPreview, paintShopPreview, drawItem, TILE } from './render.js';
 import { Input } from './input.js';
 import { sfx } from './audio.js';
 import { connectOnline, connectOffline } from './net.js';
@@ -23,6 +23,7 @@ const S = {
   profile: null, shopBack: 'scr-lobby',
 };
 if (!CHAR_BY_ID[S.charId]) S.charId = 'bin';
+if (params.has('debug')) window.bb = S;   // mở trang với ?debug để xem trạng thái trong Console
 
 const renderer = new Renderer($('#cv'));
 const input = new Input();
@@ -167,7 +168,7 @@ function renderRoom() {
       <select ${canEditTeam ? '' : 'disabled'}>${TEAMS.map((t, ti) => `<option value="${ti}" ${ti === m.team ? 'selected' : ''}>Đội ${t.name}</option>`).join('')}</select>
       ${m.id === r.host || m.bot ? '' : `<span class="badge ${m.ready ? 'ok' : ''}">${m.ready ? 'Sẵn sàng' : 'Chưa sẵn sàng'}</span>`}
       <div class="gear-row"></div>`;
-    paintCharPreview(el.querySelector('canvas'), m.charId);
+    paintCharPreview(el.querySelector('canvas'), m.charId, 0, m.outfit);
     if (r.gear) for (const g of m.gear || []) { const c = itemCanvas(SHOP[g].icon, 22); c.title = SHOP[g].name; el.querySelector('.gear-row').appendChild(c); }
     el.querySelector('select').onchange = (e) => S.conn.send({ t: 'team', team: +e.target.value, id: m.id });
     el.querySelector('.kick')?.addEventListener('click', () => S.conn.send({ t: 'kick', id: m.id }));
@@ -192,7 +193,7 @@ function renderRoom() {
   for (const c of CHARACTERS) {
     const b = document.createElement('button');
     b.className = me?.charId === c.id ? 'sel' : ''; b.title = `${c.name} – ${c.desc}`;
-    b.innerHTML = '<canvas></canvas>'; paintCharPreview(b.querySelector('canvas'), c.id);
+    b.innerHTML = '<canvas></canvas>'; paintCharPreview(b.querySelector('canvas'), c.id, 0, S.profile?.outfit);
     b.onclick = () => setChar(c.id);
     cr.appendChild(b);
   }
@@ -219,51 +220,87 @@ $('#shop-back').onclick = () => {
 function openShop() {
   if (!S.profile) return toast('Đang tải ví xu, thử lại sau giây lát');
   S.shopBack = currentScreen();
+  S.tryOn = null;
   renderShop();
   show('scr-shop');
 }
 function updateCoins() {
   document.querySelectorAll('.coins').forEach((el) => { el.textContent = `🪙 ${S.profile ? S.profile.coins : 0}`; });
 }
+const TAB_NOTES = {
+  item: 'Mua bao nhiêu cũng được. Mỗi trận tự mang theo tối đa số lượng ghi trên thẻ; dùng không hết được hoàn lại.',
+  outfit: 'Trang phục chỉ đổi ngoại hình, mọi người trong trận đều nhìn thấy. Bấm "Thử" để xem trước.',
+  skin: 'Đổi kiểu quả bóng nước bạn đặt trong trận. Bấm "Thử" để xem trước.',
+  gear: `Tăng chỉ số khi vào trận (không vượt giới hạn nhân vật). Mặc tối đa ${MAX_EQUIP} món. Chủ phòng có thể tắt.`,
+};
+S.shopTab = 'item';
 function renderShop() {
   const P = S.profile; if (!P) return;
   updateCoins();
-  const cons = $('#shop-consumables'), gear = $('#shop-gear');
-  cons.innerHTML = ''; gear.innerHTML = '';
+  // tab
+  $('#shop-tabs').innerHTML = SHOP_TABS.map((t) => `<button class="tab ${t.kind === S.shopTab ? 'on' : ''}" data-tab="${t.kind}">${t.icon} ${t.name}</button>`).join('');
+  $('#shop-tabs').querySelectorAll('[data-tab]').forEach((b) => { b.onclick = () => { S.shopTab = b.dataset.tab; renderShop(); }; });
+  $('#shop-tab-note').textContent = TAB_NOTES[S.shopTab];
+  // danh sách hàng
+  const list = $('#shop-list'); list.innerHTML = '';
   for (const [id, it] of Object.entries(SHOP)) {
+    if (it.kind !== S.shopTab) continue;
+    const owned = P.owned.includes(id);
+    const using = it.kind === 'outfit' ? P.outfit === id : it.kind === 'skin' ? P.skin === id : P.equipped.includes(id);
     const card = document.createElement('div');
-    card.className = 'shop-card';
-    card.appendChild(itemCanvas(it.icon, 52));
+    card.className = 'shop-card' + (using ? ' worn' : '') + (S.tryOn === id ? ' trying' : '');
+    card.appendChild(itemCanvas(it.icon, 56));
     const info = document.createElement('div'); info.className = 'info';
+    const status = it.kind === 'item'
+      ? `Trong kho: <b>${P.inv[id]}</b> · mang ${it.carry}/trận · phím <kbd>${it.key}</kbd>`
+      : using ? '✅ Đang dùng' : owned ? 'Đã có' : `<b class="price">${it.price} 🪙</b>`;
+    info.innerHTML = `<b class="nm">${it.name}</b><small>${it.desc}</small><span class="have">${status}</span>`;
     const acts = document.createElement('div'); acts.className = 'acts';
-    const btn = (label, cost, onClick, primary = true) => {
-      const b = document.createElement('button');
-      b.className = 'btn small' + (primary ? ' primary' : ''); b.textContent = label;
-      b.disabled = cost > P.coins; b.onclick = onClick; acts.appendChild(b);
+    const btn = (label, cls, disabled, onClick) => {
+      const b = document.createElement('button'); b.className = 'btn small ' + cls; b.textContent = label;
+      b.disabled = disabled; b.onclick = onClick; acts.appendChild(b);
     };
-    if (it.kind === 'consumable') {
-      info.innerHTML = `<b>${it.name}</b><small>${it.desc}</small><span class="have">Trong kho: <b>${P.inv[id]}</b> · mang tối đa ${it.carry}/trận</span>`;
-      btn(`Mua 1 · ${it.price}🪙`, it.price, () => S.conn.send({ t: 'buy', item: id, qty: 1 }));
-      btn(`Mua 5 · ${it.price * 5}🪙`, it.price * 5, () => S.conn.send({ t: 'buy', item: id, qty: 5 }), false);
-      cons.appendChild(card);
+    const buy = (qty) => S.conn.send({ t: 'buy', item: id, qty });
+    if (it.kind === 'item') {
+      btn(`Mua 1 · ${it.price}🪙`, 'primary', it.price > P.coins, () => buy(1));
+      btn(`Mua 5 · ${it.price * 5}🪙`, '', it.price * 5 > P.coins, () => buy(5));
+    } else if (!owned) {
+      if (it.kind !== 'gear') btn(S.tryOn === id ? 'Bỏ thử' : 'Thử', '', false, () => { S.tryOn = S.tryOn === id ? null : id; renderShop(); });
+      btn(`Mua · ${it.price}🪙`, 'primary', it.price > P.coins, () => { S.tryOn = null; buy(1); });
     } else {
-      const owned = P.owned.includes(id), worn = P.equipped.includes(id);
-      card.classList.toggle('worn', worn);
-      info.innerHTML = `<b>${it.name}</b><small>${it.desc}</small><span class="have">${worn ? '✅ Đang mặc' : owned ? 'Đã có' : 'Chưa có'}</span>`;
-      if (!owned) btn(`Mua · ${it.price}🪙`, it.price, () => S.conn.send({ t: 'buy', item: id }));
-      else btn(worn ? 'Tháo ra' : 'Mặc vào', 0, () => S.conn.send({ t: 'equip', item: id, on: !worn }), !worn);
-      gear.appendChild(card);
+      btn(using ? (it.kind === 'gear' ? 'Tháo ra' : 'Bỏ dùng') : (it.kind === 'gear' ? 'Mặc vào' : 'Dùng'), using ? '' : 'primary', false,
+        () => S.conn.send({ t: 'equip', item: id, on: !using }));
     }
     card.append(info, acts);
+    list.appendChild(card);
   }
-  $('#equip-count').textContent = `(đang mặc ${P.equipped.length}/${MAX_EQUIP})`;
-  $('#shop-earn').innerHTML = `
-    <div>🎮 Mỗi trận: <b>+${REWARD.play}</b></div><div>🏆 Thắng: <b>+${REWARD.win}</b></div>
-    <div>💥 Hạ 1 đối thủ: <b>+${REWARD.kill}</b></div><div>📦 Phá 1 thùng: <b>+${REWARD.box}</b></div>`;
+  // cột bên trái: hành trang mang vào trận + đồ đang dùng
+  $('#shop-bag').innerHTML = '';
+  for (const id of ITEM_IDS) {
+    const it = SHOP[id], take = Math.min(P.inv[id], it.carry);
+    const d = document.createElement('div'); d.className = 'bag-slot' + (take ? '' : ' empty');
+    d.title = `${it.name}: mang ${take}/${it.carry} vào trận (kho có ${P.inv[id]})`;
+    d.appendChild(itemCanvas(it.icon, 40));
+    d.insertAdjacentHTML('beforeend', `<span class="cnt">${take}/${it.carry}</span><kbd>${it.key}</kbd>`);
+    $('#shop-bag').appendChild(d);
+  }
+  const wearing = [P.outfit, P.skin, ...P.equipped].filter(Boolean).map((id) => SHOP[id].name);
+  $('#shop-wearing').textContent = wearing.length ? wearing.join(' · ') : 'Chưa dùng món nào';
+  $('#shop-earn').innerHTML = `🎮 Mỗi trận <b>+${REWARD.play}</b> · 🏆 Thắng <b>+${REWARD.win}</b> · 💥 Hạ đối thủ <b>+${REWARD.kill}</b> · 📦 Phá thùng <b>+${REWARD.box}</b>`;
   $('#wallet-note').textContent = S.offline
-    ? 'Bạn đang chơi offline: ví này lưu trong trình duyệt, tách riêng với ví online.'
-    : `Ví online lưu trên server, gắn với trình duyệt này. Đã chơi ${P.games} trận, thắng ${P.wins}.`;
+    ? 'Đang chơi offline: ví này lưu trong trình duyệt, tách riêng với ví online.'
+    : `Ví online lưu trên server. Đã chơi ${P.games} trận, thắng ${P.wins}.`;
+  paintPreview();
 }
+/** Khung nhân vật xem trước: đang "Thử" món nào thì mặc món đó */
+function paintPreview(t = 0) {
+  const P = S.profile; if (!P) return;
+  const tryIt = S.tryOn && SHOP[S.tryOn];
+  const outfit = tryIt?.kind === 'outfit' ? S.tryOn : P.outfit;
+  const skin = tryIt?.kind === 'skin' ? S.tryOn : P.skin;
+  paintShopPreview($('#shop-preview'), S.charId, outfit, skin, t);
+}
+setInterval(() => { if (currentScreen() === 'scr-shop') paintPreview(performance.now() / 1000); }, 50);
 
 // ---------------- NHẬN TIN TỪ SERVER ----------------
 function onMsg(m) {
@@ -322,7 +359,7 @@ function startGame(m) {
     info: new Map(m.players.map((p) => [p.id, p])),
     grid: m.g, snaps: [], latest: null, pending: [], seq: 0,
     pred: null, prev: null, corr: { x: 0, y: 0 }, me: null, myDir: 2, myMoving: false,
-    acc: 0, phase: 'countdown', ended: false, lastCount: -1, goAt: 0,
+    acc: 0, phase: 'countdown', ended: false, lastCount: -1, goAt: 0, ghosts: [],
   };
   renderer.setMap(MAP_BY_ID[m.map]);
   renderer.particles = [];
@@ -365,8 +402,12 @@ function onSnapshot(s) {
   const snap = {
     at: performance.now(), ph: s.ph, tl: s.tl, cd: s.cd,
     players: s.p.map((a) => ({ ...decodePlayer(a), ...pickInfo(G.info.get(a[0])) })),
-    bombs: s.b.map(decodeBomb), flames: s.f.map(decodeFlame),
+    bombs: s.b.map(decodeBomb), flames: s.f.map(decodeFlame), darts: (s.dt || []).map(decodeDart),
   };
+  // Bóng dự đoán: server đã có bóng của mình ở ô đó -> bỏ bóng dự đoán; quá lâu không thấy -> server từ chối
+  const wait = Math.max(450, S.ping * 2 + 250);
+  G.ghosts = G.ghosts.filter((g) => snap.at - g.born < wait
+    && !snap.bombs.some((b) => b.owner === S.myId && Math.round(b.x) === g.x && Math.round(b.y) === g.y));
   G.snaps.push(snap); if (G.snaps.length > 30) G.snaps.shift();
   G.latest = snap; G.phase = s.ph;
   handleEvents(s.e, snap);
@@ -388,20 +429,43 @@ function onSnapshot(s) {
   } else G.prev = { ...sim };
   G.pred = sim;
 }
-const pickInfo = (i) => (i ? { name: i.name, charId: i.charId, team: i.team, bot: i.bot } : {});
+const pickInfo = (i) => (i ? { name: i.name, charId: i.charId, team: i.team, bot: i.bot, outfit: i.outfit, skin: i.skin } : {});
 
 /** Mỗi tick client (30Hz): đọc phím -> gửi server -> tự dự đoán di chuyển ngay */
 function localTick() {
   const G = S.game;
   const act = input.consume();
   if (!G || !G.latest || !G.pred || !G.me || G.me.state === 'dead' || G.phase === 'end') return;
-  const inp = { t: 'in', q: ++G.seq, d: input.dir(), b: act.b, n: act.n, s: act.s };
+  // t: loại tin nhắn ('in') · f: ném phi tiêu · r: bom hẹn giờ
+  const inp = { t: 'in', q: ++G.seq, d: input.dir(), b: act.b, n: act.n, s: act.s, f: act.t, r: act.r };
   S.conn.send(inp);
+  predictBombs(G, act);
   G.pending.push(inp); if (G.pending.length > 90) G.pending.shift();
   G.prev = { ...G.pred };
   if (G.phase === 'play' && inp.d) movePlayer({ grid: G.grid, bombs: G.latest.bombs }, G.pred, inp.d, (speedOf(G.pred) * TICK_MS) / 1000);
   if (inp.d) G.myDir = inp.d;
   G.myMoving = !!inp.d && G.phase === 'play';
+}
+
+/**
+ * DỰ ĐOÁN ĐẶT BÓNG: hiện quả bóng NGAY khi bấm phím (không chờ server ~50-150ms).
+ * Kiểm tra giống hệt luật server (còn lượt bóng, ô trống) để hiếm khi đoán sai.
+ */
+function predictBombs(G, act) {
+  const me = G.me;
+  if (G.phase !== 'play' || me.state !== 'alive' || (!act.b && !act.r)) return;
+  const x = Math.round(G.pred.x), y = Math.round(G.pred.y);
+  const all = [...G.latest.bombs, ...G.ghosts];
+  const cellFree = G.grid[y * 15 + x] === '.' && !all.some((b) => Math.round(b.x) === x && Math.round(b.y) === y);
+  const born = performance.now();
+  if (act.b && cellFree && all.filter((b) => b.owner === S.myId && !b.remote).length < me.maxBombs) {
+    G.ghosts.push({ id: 'g' + born, ghost: true, owner: S.myId, x, y, born, range: me.range, remote: false });
+    sfx.place();
+  } else if (act.r && cellFree && !me.remoteOn && me.remotes > 0 && !G.ghosts.some((g) => g.remote)) {
+    G.ghosts.push({ id: 'g' + born, ghost: true, owner: S.myId, x, y, born, range: me.range + 1, remote: true });
+    sfx.place();
+  }
+  if (act.t && me.darts > 0) sfx.kick();
 }
 
 /** Nội suy người chơi khác giữa 2 snapshot (vẽ trễ ~80ms để luôn mượt) */
@@ -413,11 +477,17 @@ function interpolated(now) {
   const k = b.at > a.at ? Math.max(0, Math.min(1, (rt - a.at) / (b.at - a.at))) : 1;
   const lerp = (p, q, key) => (q && Math.abs(q[key] - p[key]) < 2 ? q[key] + (p[key] - q[key]) * k : p[key]);
   const players = b.players.map((p) => { const q = a.players.find((o) => o.id === p.id); return { ...p, x: lerp(p, q, 'x'), y: lerp(p, q, 'y') }; });
-  const bombs = b.bombs.map((bb) => {
-    const q = a.bombs.find((o) => o.id === bb.id);
-    return { ...bb, x: lerp(bb, q, 'x'), y: lerp(bb, q, 'y'), left: q ? q.left + (bb.left - q.left) * k : bb.left };
+  // Bóng, tia nước, phi tiêu: lấy snapshot MỚI NHẤT (không vẽ trễ) để phản hồi nhanh nhất
+  const L = G.latest, since = now - L.at, prevL = snaps[snaps.length - 2];
+  const bombs = L.bombs.map((bb) => {
+    const q = bb.moving && prevL ? prevL.bombs.find((o) => o.id === bb.id) : null;   // bóng đang bị đẩy: nội suy
+    const kk = Math.min(1, since / TICK_MS);
+    return { ...bb, x: q ? q.x + (bb.x - q.x) * kk : bb.x, y: q ? q.y + (bb.y - q.y) * kk : bb.y, left: bb.left - since };
   });
-  return { players, bombs, flames: b.flames };
+  for (const g of G.ghosts) bombs.push({ ...g, left: (g.remote ? TIMING.REMOTE_MAX : TIMING.BOMB_FUSE) - (now - g.born) });
+  const step = Math.min(0.6, (since / 1000) * 15);                                   // phi tiêu bay tiếp giữa 2 snapshot
+  const darts = L.darts.map((d) => ({ ...d, x: d.x + [0, 0, 0, -step, step][d.d], y: d.y + [0, -step, step, 0, 0][d.d] }));
+  return { players, bombs, flames: L.flames.map((f) => ({ ...f, left: f.left - since })), darts };
 }
 
 function handleEvents(events, snap) {
@@ -425,7 +495,9 @@ function handleEvents(events, snap) {
   let drops = 0;
   for (const e of events || []) {
     switch (e.k) {
-      case 'place': sfx.place(); break;
+      case 'place': if (e.id !== S.myId) sfx.place(); break;          // bóng của mình đã kêu lúc dự đoán
+      case 'dart': if (e.id !== S.myId) sfx.kick(); break;
+      case 'dartHit': renderer.splash(e.x, e.y, 5, '#c7d3e0'); break;
       case 'boom': sfx.boom(); renderer.splash(e.x, e.y, 12); renderer.bump(3); break;
       case 'burn': renderer.splash(e.x, e.y, 6, '#ffe28a'); break;
       case 'kick': sfx.kick(); break;
@@ -451,12 +523,15 @@ function handleEvents(events, snap) {
 }
 
 // ---------------- HUD ----------------
-const ME_STATS = [['bomb', 'maxBombs'], ['range', 'range'], ['speed', 'speedLv'], ['needle', 'needles'], ['shield', 'shields'], ['kick', 'kick'], ['mount', 'mount']];
+// [icon, trường dữ liệu, phím dùng]
+const ME_STATS = [['bomb', 'maxBombs'], ['range', 'range'], ['speed', 'speedLv'], ['kick', 'kick'], ['mount', 'mount'],
+  ['needle', 'needles', 'Z'], ['shield', 'shields', 'X'], ['dart', 'darts', 'C'], ['remote', 'remotes', 'V']];
 function buildMeHud() {
   const box = $('#hud-me'); box.innerHTML = '';
-  for (const [type] of ME_STATS) {
-    const d = document.createElement('div'); d.className = 'stat'; d.title = ITEMS[type].name;
-    d.appendChild(itemCanvas(type, 30)); d.insertAdjacentHTML('beforeend', '<span></span>');
+  for (const [type, , key] of ME_STATS) {
+    const d = document.createElement('div'); d.className = 'stat' + (key ? ' slot-item' : '');
+    d.title = (ITEMS[type] || SHOP[type]).name + (key ? ` (phím ${key})` : '');
+    d.appendChild(itemCanvas(type, 30)); d.insertAdjacentHTML('beforeend', `<span></span>${key ? `<kbd>${key}</kbd>` : ''}`);
     box.appendChild(d);
   }
 }
@@ -468,7 +543,7 @@ function updateHud(view) {
   timer.textContent = `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
   timer.classList.toggle('danger', L.ph === 'play' && L.tl <= TIMING.SUDDEN_DEATH);
   $('#hud-ping').textContent = S.offline ? 'Offline' : `${S.ping} ms`;
-  const key = view.players.map((p) => p.id + p.state + p.kills).join() + JSON.stringify(G.me && ME_STATS.map(([, f]) => G.me[f]));
+  const key = view.players.map((p) => p.id + p.state + p.kills).join() + JSON.stringify(G.me && [...ME_STATS.map(([, f]) => G.me[f]), G.me.remoteOn]);
   if (key === hudKey) return;
   hudKey = key;
   $('#hud-players').innerHTML = view.players.map((p) => `
@@ -476,8 +551,10 @@ function updateHud(view) {
   if (G.me) {
     $('#hud-me').querySelectorAll('.stat').forEach((el, i) => {
       const v = G.me[ME_STATS[i][1]];
-      el.querySelector('span').textContent = typeof v === 'boolean' ? (v ? '✓' : '–') : v;
-      el.classList.toggle('off', !v);
+      const remoteReady = ME_STATS[i][0] === 'remote' && G.me.remoteOn;     // đã đặt -> bấm V để kích nổ
+      el.querySelector('span').textContent = remoteReady ? 'Nổ!' : typeof v === 'boolean' ? (v ? '✓' : '–') : v;
+      el.classList.toggle('off', !v && !remoteReady);
+      el.classList.toggle('armed', remoteReady);
     });
   }
 }
@@ -529,7 +606,7 @@ function frame(now) {
         Object.assign(mine, { ...G.me, x: mine.x, y: mine.y, dir: G.myDir, moving: G.myMoving && G.me.state === 'alive', name: mine.name, charId: mine.charId, team: mine.team });
       }
     }
-    renderer.draw({ grid: G.grid, players: view.players.filter((p) => p.state !== 'dead'), bombs: view.bombs, flames: view.flames, myId: S.myId, time: now, dt: dtMs / 1000 });
+    renderer.draw({ grid: G.grid, players: view.players.filter((p) => p.state !== 'dead'), bombs: view.bombs, flames: view.flames, darts: view.darts, myId: S.myId, time: now, dt: dtMs / 1000 });
     updateHud(view);
     updateCountdown();
   }

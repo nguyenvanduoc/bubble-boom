@@ -24,9 +24,13 @@ export const TIMING = {
   RESULT_TIME: 6000,      // hiện bảng kết quả 6 giây rồi về phòng
   SUDDEN_DEATH: 45000,    // còn 45 giây: tường bắt đầu rơi xoắn ốc thu hẹp bản đồ
   SUDDEN_STEP: 330,       // cứ 0.33 giây rơi 1 khối tường
+  REMOTE_MAX: 8000,       // Bom Hẹn Giờ: không kích nổ thì tự nổ sau 8 giây
+  DART_COOLDOWN: 350,     // khoảng nghỉ giữa 2 lần ném Phi Tiêu
 };
 
 export const KICK_SPEED = 9;     // tốc độ bóng bị đẩy (ô/giây)
+export const DART_SPEED = 15;    // tốc độ Phi Tiêu (ô/giây)
+export const DART_RANGE = 10;    // Phi Tiêu bay tối đa 10 ô
 export const TRAPPED_SPEED = 0.7;// tốc độ trôi khi bị nhốt (ô/giây)
 export const MOUNT_SPEED = 5.6;  // tốc độ tối thiểu khi cưỡi slime
 export const BOX_DENSITY = 0.82; // tỉ lệ ô '?' biến thành thùng
@@ -53,17 +57,42 @@ export const ITEMS = {
 export const ITEM_BY_CH = Object.fromEntries(Object.entries(ITEMS).map(([k, v]) => [v.ch, k]));
 
 // ---------------- CỬA HÀNG ----------------
-// consumable: mua theo số lượng, mang vào trận (tối đa "carry"), không dùng hết được hoàn lại
-// gear: mua 1 lần dùng mãi, mặc tối đa MAX_EQUIP món, tăng chỉ số khởi đầu (không vượt giới hạn nhân vật)
+// item   : vật phẩm tiêu hao, mua theo số lượng, tự mang vào trận (tối đa "carry"), dùng bằng phím "key".
+//          Dùng không hết -> hoàn lại vào kho sau trận.
+// outfit : trang phục (chỉ đổi ngoại hình), mặc 1 bộ.
+// skin   : kiểu bóng nước (chỉ đổi ngoại hình), dùng 1 kiểu.
+// gear   : phụ kiện tăng chỉ số khởi đầu, mặc tối đa MAX_EQUIP món (không vượt giới hạn nhân vật).
+export const SHOP_TABS = [
+  { kind: 'item', name: 'Vật phẩm', icon: '🎒' },
+  { kind: 'outfit', name: 'Trang phục', icon: '👒' },
+  { kind: 'skin', name: 'Bóng nước', icon: '🎈' },
+  { kind: 'gear', name: 'Phụ kiện', icon: '⚙️' },
+];
 export const SHOP = {
-  needle: { kind: 'consumable', name: 'Kim Bạc',        desc: 'Tự thoát bong bóng (phím Z)',   price: 40,  icon: 'needle', carry: 3 },
-  shield: { kind: 'consumable', name: 'Khiên Sao',      desc: 'Bất tử 2.5 giây (phím X)',      price: 60,  icon: 'shield', carry: 2 },
-  boots:  { kind: 'gear', name: 'Giày Lướt Sóng', desc: '+1 tốc độ khi vào trận',         price: 300, icon: 'boots',  bonus: { s: 1 } },
-  bag:    { kind: 'gear', name: 'Balo Bóng',      desc: '+1 bóng nước khi vào trận',      price: 400, icon: 'bag',    bonus: { b: 1 } },
-  nozzle: { kind: 'gear', name: 'Vòi Rồng',       desc: '+1 tầm nổ khi vào trận',         price: 400, icon: 'nozzle', bonus: { r: 1 } },
-  glove:  { kind: 'gear', name: 'Găng Thần',      desc: 'Vào trận có sẵn Găng Đẩy bóng',  price: 250, icon: 'glove',  kick: true },
-  vest:   { kind: 'gear', name: 'Áo Phao',        desc: 'Bong bóng giữ lâu thêm 1.5 giây',price: 350, icon: 'vest',   trapBonus: 1500 },
+  needle: { kind: 'item', name: 'Kim Bạc',     desc: 'Tự thoát khỏi bong bóng khi bị nhốt',              price: 40, icon: 'needle', carry: 3, key: 'Z', field: 'needles' },
+  shield: { kind: 'item', name: 'Khiên Sao',   desc: 'Bất tử 2.5 giây, tia nước không làm gì được',      price: 60, icon: 'shield', carry: 2, key: 'X', field: 'shields' },
+  dart:   { kind: 'item', name: 'Phi Tiêu',    desc: 'Ném thẳng phía trước: kích nổ bóng nước, chọc vỡ bong bóng đối thủ', price: 50, icon: 'dart', carry: 5, key: 'C', field: 'darts' },
+  remote: { kind: 'item', name: 'Bom Hẹn Giờ', desc: 'Đặt quả bóng đặc biệt (tầm +1), bấm lần nữa để kích nổ. Tự nổ sau 8 giây', price: 80, icon: 'remote', carry: 2, key: 'V', field: 'remotes' },
+
+  pirate: { kind: 'outfit', name: 'Mũ Cướp Biển',  desc: 'Thuyền trưởng của mọi trận hải chiến', price: 300, icon: 'outfit:pirate' },
+  wizard: { kind: 'outfit', name: 'Mũ Phù Thuỷ',   desc: 'Mũ nhọn lấp lánh sao',                 price: 350, icon: 'outfit:wizard' },
+  shades: { kind: 'outfit', name: 'Kính Râm Ngầu', desc: 'Ngầu từ đầu trận tới cuối trận',       price: 250, icon: 'outfit:shades' },
+  cape:   { kind: 'outfit', name: 'Áo Choàng Đỏ',  desc: 'Áo choàng tung bay khi chạy',          price: 450, icon: 'outfit:cape' },
+  crown:  { kind: 'outfit', name: 'Vương Miện',    desc: 'Dành cho nhà vô địch',                 price: 900, icon: 'outfit:crown' },
+
+  straw:  { kind: 'skin', name: 'Bóng Dâu Tây',  desc: 'Bóng nước đỏ hạt vàng',    price: 200,  icon: 'skin:straw' },
+  melon:  { kind: 'skin', name: 'Bóng Dưa Hấu',  desc: 'Bóng sọc xanh mát lạnh',  price: 250,  icon: 'skin:melon' },
+  pumpkin:{ kind: 'skin', name: 'Bóng Bí Ngô',   desc: 'Bóng cam có cuống xanh',  price: 300,  icon: 'skin:pumpkin' },
+  star:   { kind: 'skin', name: 'Bóng Ngôi Sao', desc: 'Bóng vàng in hình sao',   price: 350,  icon: 'skin:star' },
+  gold:   { kind: 'skin', name: 'Bóng Hoàng Kim',desc: 'Bóng vàng ròng lấp lánh', price: 1000, icon: 'skin:gold' },
+
+  boots:  { kind: 'gear', name: 'Giày Lướt Sóng', desc: '+1 tốc độ khi vào trận',          price: 300, icon: 'boots',  bonus: { s: 1 } },
+  bag:    { kind: 'gear', name: 'Balo Bóng',      desc: '+1 bóng nước khi vào trận',       price: 400, icon: 'bag',    bonus: { b: 1 } },
+  nozzle: { kind: 'gear', name: 'Vòi Rồng',       desc: '+1 tầm nổ khi vào trận',          price: 400, icon: 'nozzle', bonus: { r: 1 } },
+  glove:  { kind: 'gear', name: 'Găng Thần',      desc: 'Vào trận có sẵn Găng Đẩy bóng',   price: 250, icon: 'glove',  kick: true },
+  vest:   { kind: 'gear', name: 'Áo Phao',        desc: 'Bong bóng giữ lâu thêm 1.5 giây', price: 350, icon: 'vest',   trapBonus: 1500 },
 };
+export const ITEM_IDS = Object.keys(SHOP).filter((id) => SHOP[id].kind === 'item');
 export const MAX_EQUIP = 2;          // số trang bị mặc cùng lúc
 export const START_COINS = 300;      // xu tặng người chơi mới
 export const REWARD = { play: 20, win: 60, kill: 15, box: 1 };  // xu thưởng sau mỗi trận

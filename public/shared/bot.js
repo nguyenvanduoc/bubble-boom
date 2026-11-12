@@ -27,7 +27,8 @@ function blastCells(game, b, bombCells) {
 
 /** danger[i] = thời điểm sớm nhất ô i bị tia nước (Infinity = an toàn) */
 function dangerMap(game, extra) {
-  const bombs = game.bombs.map((b) => ({ x: Math.round(b.x), y: Math.round(b.y), range: b.range, at: b.at }));
+  // Bom Hẹn Giờ có thể bị kích nổ bất cứ lúc nào -> coi như sắp nổ
+  const bombs = game.bombs.map((b) => ({ x: Math.round(b.x), y: Math.round(b.y), range: b.range, at: b.remote ? Math.min(b.at, game.now + 400) : b.at }));
   if (extra) bombs.push(extra);
   const bombCells = new Map(bombs.map((b) => [idx(b.x, b.y), b]));
   const blasts = bombs.map((b) => blastCells(game, b, bombCells));

@@ -6,7 +6,7 @@
 import {
   COLS, ROWS, TICK_MS, TIMING, DIRS, ITEMS, ITEM_BY_CH, CHARACTERS, CHAR_BY_ID,
   MAPS, MAP_BY_ID, SPAWN_ORDER, BOX_DENSITY, ITEM_CHANCE, KICK_SPEED,
-  TRAPPED_SPEED, MOUNT_SPEED, speedFromLevel,
+  TRAPPED_SPEED, MOUNT_SPEED, speedFromLevel, DART_SPEED, DART_RANGE,
 } from './constants.js';
 
 const EPS = 1e-4;
@@ -121,14 +121,15 @@ function spiralOrder() {
 // ---------------- Mã hoá gọn dữ liệu gửi qua mạng ----------------
 const STATES = ['alive', 'trapped', 'dead'];
 export const PLAYER_FIELDS = ['id', 'x', 'y', 'dir', 'moving', 'state', 'trapLeft', 'inv', 'shieldLeft',
-  'mount', 'kick', 'maxBombs', 'range', 'speedLv', 'needles', 'shields', 'ack', 'kills'];
+  'mount', 'kick', 'maxBombs', 'range', 'speedLv', 'needles', 'shields', 'ack', 'kills', 'darts', 'remotes', 'remoteOn'];
 export function decodePlayer(arr) {
   const o = {};
   PLAYER_FIELDS.forEach((f, i) => { o[f] = arr[i]; });
-  o.state = STATES[o.state]; o.moving = !!o.moving; o.mount = !!o.mount; o.kick = !!o.kick; o.inv = !!o.inv;
+  o.state = STATES[o.state]; o.moving = !!o.moving; o.mount = !!o.mount; o.kick = !!o.kick; o.inv = !!o.inv; o.remoteOn = !!o.remoteOn;
   return o;
 }
-export const decodeBomb = (a) => ({ id: a[0], x: a[1], y: a[2], left: a[3], owner: a[4], range: a[5], moving: !!a[6] });
+export const decodeBomb = (a) => ({ id: a[0], x: a[1], y: a[2], left: a[3], owner: a[4], range: a[5], moving: !!a[6], remote: !!a[7] });
+export const decodeDart = (a) => ({ id: a[0], x: a[1], y: a[2], d: a[3] });
 export const decodeFlame = (a) => ({ x: a[0], y: a[1], k: a[2], d: a[3], left: a[4] });
 
 // ============================================================
@@ -152,6 +153,8 @@ export class Game {
     this.events = [];              // sự kiện gửi kèm snapshot (âm thanh, hiệu ứng)
     this.gridVersion = 1;
     this.nextBombId = 1;
+    this.darts = [];               // phi tiêu đang bay
+    this.nextDartId = 1;
     this.result = null;
     this.spiral = spiralOrder();   // thứ tự tường rơi khi thu hẹp bản đồ
     this.fallen = 0;
@@ -167,8 +170,12 @@ export class Game {
         maxBombs: Math.min(ch.b[0] + (bon.b | 0), ch.b[1]),
         range: Math.min(ch.r[0] + (bon.r | 0), ch.r[1]),
         speedLv: Math.min(ch.s[0] + (bon.s | 0), ch.s[1]),
-        needles: lo.needles | 0, shields: lo.shields | 0, kick: !!lo.kick, mount: false,
+        // vật phẩm mang từ cửa hàng vào trận
+        needles: lo.items?.needle | 0, shields: lo.items?.shield | 0,
+        darts: lo.items?.dart | 0, remotes: lo.items?.remote | 0, remoteBomb: 0, dartCd: 0,
+        kick: !!lo.kick, mount: false,
         trapBonus: lo.trapBonus | 0, gear: lo.gear || [], boxes: 0,
+        outfit: info.outfit || null, skin: info.skin || null,   // ngoại hình (không ảnh hưởng luật chơi)
         state: 'alive', trapUntil: 0, trappedBy: null, invulnUntil: 0, shieldUntil: 0,
         kills: 0, ack: 0, queue: [], budget: 0, deadAt: 0, ai: {},
       });
@@ -176,18 +183,19 @@ export class Game {
   }
 
   infoList() {
-    return [...this.players.values()].map((p) => ({ id: p.id, name: p.name, charId: p.charId, team: p.team, bot: p.bot }));
+    return [...this.players.values()].map((p) => ({ id: p.id, name: p.name, charId: p.charId, team: p.team, bot: p.bot, outfit: p.outfit, skin: p.skin }));
   }
 
   bombAt(x, y) {
     return this.bombs.find((b) => Math.round(b.x) === x && Math.round(b.y) === y) || null;
   }
 
-  /** Nhận input của người chơi: { q: số thứ tự, d: hướng 0-4, b: đặt bóng, n: dùng kim, s: dùng khiên } */
+  /** Nhận input: { q: số thứ tự, d: hướng 0-4, b: đặt bóng, n: kim, s: khiên, f: phi tiêu, r: bom hẹn giờ }
+   *  (không dùng tên 't' vì tin nhắn mạng đã dùng t = loại tin) */
   pushInput(id, inp) {
     const p = this.players.get(id);
     if (!p || typeof inp !== 'object') return;
-    p.queue.push({ q: inp.q | 0, d: Math.max(0, Math.min(4, inp.d | 0)), b: !!inp.b, n: !!inp.n, s: !!inp.s });
+    p.queue.push({ q: inp.q | 0, d: Math.max(0, Math.min(4, inp.d | 0)), b: !!inp.b, n: !!inp.n, s: !!inp.s, f: !!inp.f, r: !!inp.r });
     if (p.queue.length > 15) p.queue.splice(0, p.queue.length - 15); // mạng lag quá -> bỏ bớt
   }
 
@@ -213,6 +221,7 @@ export class Game {
 
     this.suddenDeath();
     this.updateSlidingBombs();
+    this.updateDarts();
     // 2) Bóng đến giờ nổ (kể cả nổ dây chuyền)
     for (let guard = 0; guard < 64; guard++) {
       const i = this.bombs.findIndex((b) => b.at <= now);
@@ -299,6 +308,13 @@ export class Game {
       this.events.push({ k: 'shield', id: p.id });
     }
     if (inp.b && p.state === 'alive') this.placeBomb(p);
+    if (inp.r && p.state === 'alive') this.useRemote(p);
+    if (inp.f && p.state === 'alive' && p.darts > 0 && now >= p.dartCd) {
+      p.darts--; p.dartCd = now + TIMING.DART_COOLDOWN;
+      const d = p.dir || 2;
+      this.darts.push({ id: this.nextDartId++, owner: p.id, x: Math.round(p.x), y: Math.round(p.y), d, dist: 0 });
+      this.events.push({ k: 'dart', id: p.id });
+    }
     if (inp.d) {
       p.dir = inp.d; p.moving = true;
       movePlayer(this, p, inp.d, (speedOf(p) * TICK_MS) / 1000, (cx, cy, dx, dy) => {
@@ -311,11 +327,52 @@ export class Game {
 
   placeBomb(p) {
     const cx = Math.round(p.x), cy = Math.round(p.y);
-    if (this.bombs.filter((b) => b.owner === p.id).length >= p.maxBombs) return;
+    if (this.bombs.filter((b) => b.owner === p.id && !b.remote).length >= p.maxBombs) return;
     if (this.bombAt(cx, cy) || this.grid[idx(cx, cy)] !== '.') return;
     this.bombs.push({ id: this.nextBombId++, owner: p.id, x: cx, y: cy, range: p.range,
       at: this.now + TIMING.BOMB_FUSE, vx: 0, vy: 0 });
-    this.events.push({ k: 'place', x: cx, y: cy });
+    this.events.push({ k: 'place', x: cx, y: cy, id: p.id });
+  }
+
+  /** Bom Hẹn Giờ: chưa có thì đặt, đã có thì kích nổ ngay */
+  useRemote(p) {
+    const placed = this.bombs.find((b) => b.id === p.remoteBomb);
+    if (placed) { placed.at = this.now; return; }
+    if (p.remotes <= 0) return;
+    const cx = Math.round(p.x), cy = Math.round(p.y);
+    if (this.bombAt(cx, cy) || this.grid[idx(cx, cy)] !== '.') return;
+    p.remotes--;
+    const b = { id: this.nextBombId++, owner: p.id, x: cx, y: cy, range: Math.min(p.range + 1, 9),
+      at: this.now + TIMING.REMOTE_MAX, vx: 0, vy: 0, remote: true };
+    this.bombs.push(b);
+    p.remoteBomb = b.id;
+    this.events.push({ k: 'place', x: cx, y: cy, id: p.id, remote: 1 });
+  }
+
+  /** Phi tiêu bay thẳng: trúng bóng nước -> nổ ngay; trúng đối thủ đang bị nhốt -> vỡ bong bóng */
+  updateDarts() {
+    const step = 0.25;                                   // đi từng 1/4 ô để không bay xuyên qua vật
+    this.darts = this.darts.filter((dt) => {
+      const [dx, dy] = DIRS[dt.d];
+      let rem = (DART_SPEED * TICK_MS) / 1000;
+      while (rem > 0) {
+        const m = Math.min(step, rem); rem -= m;
+        dt.x = quant(dt.x + dx * m); dt.y = quant(dt.y + dy * m); dt.dist += m;
+        const cx = Math.round(dt.x), cy = Math.round(dt.y);
+        if (!inBounds(cx, cy) || dt.dist > DART_RANGE) return false;
+        const c = this.grid[idx(cx, cy)];
+        if (c === '#' || c === 'x' || c === 'y') { this.events.push({ k: 'dartHit', x: cx, y: cy }); return false; }
+        const b = this.bombAt(cx, cy);
+        if (b && dt.dist > 0.5) { b.at = Math.min(b.at, this.now); this.events.push({ k: 'dartHit', x: cx, y: cy }); return false; }
+        const owner = this.players.get(dt.owner);
+        for (const q of this.players.values()) {
+          if (q.state === 'trapped' && q.team !== owner?.team && Math.abs(q.x - dt.x) < 0.6 && Math.abs(q.y - dt.y) < 0.6) {
+            this.die(q, dt.owner); return false;
+          }
+        }
+      }
+      return true;
+    });
   }
 
   updateSlidingBombs() {
@@ -459,8 +516,10 @@ export class Game {
         p.state === 'trapped' ? Math.max(0, Math.round(p.trapUntil - now)) : 0,
         now < p.invulnUntil ? 1 : 0, Math.max(0, Math.round(p.shieldUntil - now)),
         p.mount ? 1 : 0, p.kick ? 1 : 0, p.maxBombs, p.range, p.speedLv, p.needles, p.shields, p.ack, p.kills,
+        p.darts, p.remotes, this.bombs.some((b) => b.id === p.remoteBomb) ? 1 : 0,
       ]),
-      b: this.bombs.map((b) => [b.id, b.x, b.y, Math.max(0, Math.round(b.at - now)), b.owner, b.range, b.vx || b.vy ? 1 : 0]),
+      b: this.bombs.map((b) => [b.id, b.x, b.y, Math.max(0, Math.round(b.at - now)), b.owner, b.range, b.vx || b.vy ? 1 : 0, b.remote ? 1 : 0]),
+      dt: this.darts.map((d) => [d.id, d.x, d.y, d.d]),
       f: this.flames.map((f) => [f.x, f.y, f.k, f.d, Math.round(f.until - now)]),
       e: this.events,
     };

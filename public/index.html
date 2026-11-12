@@ -33,8 +33,10 @@
       <div class="keys">
         <div><kbd>←↑↓→</kbd> / <kbd>WASD</kbd> Di chuyển</div>
         <div><kbd>Space</kbd> / <kbd>J</kbd> Đặt bóng nước</div>
-        <div><kbd>Z</kbd> / <kbd>K</kbd> Dùng kim (khi bị nhốt)</div>
-        <div><kbd>X</kbd> / <kbd>L</kbd> Bật khiên</div>
+        <div><kbd>Z</kbd> / <kbd>1</kbd> Dùng kim (khi bị nhốt)</div>
+        <div><kbd>X</kbd> / <kbd>2</kbd> Bật khiên</div>
+        <div><kbd>C</kbd> / <kbd>3</kbd> Ném phi tiêu</div>
+        <div><kbd>V</kbd> / <kbd>4</kbd> Đặt / kích nổ bom hẹn giờ</div>
         <div><kbd>Enter</kbd> Chat trong trận</div>
       </div>
       <p class="muted small">Bóng nổ sau <b>3 giây</b>. Trúng tia nước sẽ bị nhốt trong bong bóng <b>4.5 giây</b>: đồng đội chạm vào để cứu, đối thủ chạm vào là vỡ. Còn 45 giây cuối, bản đồ bắt đầu thu hẹp!</p>
@@ -107,20 +109,21 @@
       <h2>🛒 Cửa hàng</h2>
       <span class="pill coins">🪙 0</span>
     </div>
-    <div class="panel">
-      <h3>Vật phẩm mang vào trận</h3>
-      <p class="muted small">Khi bắt đầu trận, game tự lấy từ kho tối đa 3 Kim và 2 Khiên. Dùng không hết sẽ được hoàn lại sau trận.</p>
-      <div id="shop-consumables" class="shop-grid"></div>
-    </div>
-    <div class="panel">
-      <h3>Trang bị <span id="equip-count" class="muted small"></span></h3>
-      <p class="muted small">Mua một lần dùng mãi. Mặc tối đa 2 món, cộng chỉ số khi vào trận (không vượt giới hạn của nhân vật).</p>
-      <div id="shop-gear" class="shop-grid"></div>
-    </div>
-    <div class="panel">
-      <h3>Cách kiếm xu</h3>
-      <div id="shop-earn" class="keys"></div>
-      <p id="wallet-note" class="muted small"></p>
+    <div class="shop-layout">
+      <aside class="panel shop-side">
+        <canvas id="shop-preview" class="shop-preview"></canvas>
+        <h3>🎒 Hành trang mang vào trận</h3>
+        <div id="shop-bag" class="bag"></div>
+        <h3>Đang dùng</h3>
+        <p id="shop-wearing" class="small"></p>
+        <p id="shop-earn" class="small earn"></p>
+        <p id="wallet-note" class="muted small"></p>
+      </aside>
+      <div class="panel shop-main">
+        <div id="shop-tabs" class="tabs"></div>
+        <p id="shop-tab-note" class="muted small"></p>
+        <div id="shop-list" class="shop-grid"></div>
+      </div>
     </div>
   </section>
 
@@ -147,8 +150,12 @@
         <button data-dir="4" class="right">▶</button><button data-dir="2" class="down">▼</button>
       </div>
       <div class="acts">
-        <button data-act="n" class="act sm">Kim</button>
-        <button data-act="s" class="act sm">Khiên</button>
+        <div class="act-grid">
+          <button data-act="n" class="act sm">Kim</button>
+          <button data-act="s" class="act sm">Khiên</button>
+          <button data-act="t" class="act sm">Tiêu</button>
+          <button data-act="r" class="act sm">Hẹn giờ</button>
+        </div>
         <button data-act="b" class="act bomb">💧</button>
       </div>
     </div>

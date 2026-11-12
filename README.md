@@ -16,22 +16,29 @@ npm start          # mở http://localhost:3000
 
 ## Cửa hàng & ví xu
 
-- Người mới được tặng **300 xu**. Sau mỗi trận được thưởng: +20 xu khi tham gia, +60 khi thắng, +15 cho mỗi đối thủ hạ được, +1 cho mỗi thùng phá được.
-- **Vật phẩm mang vào trận:**
-  - Kim Bạc (40 xu): mang tối đa 3 cây mỗi trận.
-  - Khiên Sao (60 xu): mang tối đa 2 cái mỗi trận.
-  - Món nào dùng không hết sẽ được hoàn lại vào kho sau trận.
-- **Trang bị:** mua một lần dùng mãi, mặc tối đa 2 món cùng lúc.
-  - Giày Lướt Sóng: +1 tốc độ khi vào trận.
-  - Balo Bóng: +1 bóng nước khi vào trận.
-  - Vòi Rồng: +1 tầm nổ khi vào trận.
-  - Găng Thần: vào trận có sẵn Găng Đẩy bóng.
-  - Áo Phao: bong bóng giữ lâu thêm 1,5 giây.
-  - Chỉ số cộng thêm không vượt giới hạn tối đa của nhân vật.
-- Chủ phòng có thể **tắt trang bị** để mọi người đấu công bằng.
-- **Ví online** lưu trên server ở file `data/profiles.json`, gắn với trình duyệt qua một mã (token) trong localStorage. Có thể đổi chỗ lưu bằng biến `DATA_FILE`.
-- **Ví offline** (chơi với bot) lưu riêng trong trình duyệt.
-- Một số dịch vụ miễn phí (ví dụ Render bản free) xoá ổ đĩa mỗi lần khởi động lại. Khi đó cần gắn ổ đĩa lưu trữ (persistent disk) để giữ ví.
+Cửa hàng có 4 tab. Mua thì trừ xu ngay; vật phẩm được tự động mang vào trận.
+
+| Tab | Món | Giá | Ghi chú |
+|---|---|---|---|
+| 🎒 Vật phẩm | Kim Bạc (phím **Z**) | 40 | Tự thoát bong bóng. Mang tối đa 3 mỗi trận |
+| | Khiên Sao (**X**) | 60 | Bất tử 2,5 giây. Mang tối đa 2 |
+| | Phi Tiêu (**C**) | 50 | Ném thẳng: kích nổ bóng nước, chọc vỡ đối thủ đang bị nhốt. Mang tối đa 5 |
+| | Bom Hẹn Giờ (**V**) | 80 | Đặt quả bóng đặc biệt (tầm +1). Bấm V lần nữa để kích nổ; tự nổ sau 8 giây. Mang tối đa 2 |
+| 👒 Trang phục | Mũ Cướp Biển, Mũ Phù Thuỷ, Kính Râm, Áo Choàng Đỏ, Vương Miện | 250–900 | Chỉ đổi ngoại hình, có nút "Thử" |
+| 🎈 Bóng nước | Dâu Tây, Dưa Hấu, Bí Ngô, Ngôi Sao, Hoàng Kim | 200–1000 | Đổi kiểu quả bóng bạn đặt |
+| ⚙️ Phụ kiện | Giày Lướt Sóng, Balo Bóng, Vòi Rồng, Găng Thần, Áo Phao | 250–400 | Cộng chỉ số khi vào trận, mặc tối đa 2 món |
+
+- Vật phẩm dùng không hết sẽ được hoàn lại vào kho sau trận. Phím số `1`–`4` cũng dùng được.
+- Người mới được tặng 300 xu. Thưởng sau mỗi trận: +20 khi tham gia, +60 khi thắng, +15 cho mỗi đối thủ hạ được, +1 cho mỗi thùng phá được.
+- Chủ phòng có thể **tắt phụ kiện và vật phẩm** để đấu công bằng. Trang phục và kiểu bóng vẫn hiển thị.
+- **Ví online** lưu trên server ở file `data/profiles.json` (đổi chỗ lưu bằng biến `DATA_FILE`). **Ví offline** lưu trong trình duyệt.
+- Một số dịch vụ miễn phí xoá ổ đĩa mỗi lần khởi động lại. Khi đó cần gắn ổ đĩa lưu trữ (persistent disk) để giữ ví.
+
+## Giảm độ trễ khi đặt bóng
+
+- Client **dự đoán** việc đặt bóng: quả bóng hiện và kêu ngay khi bấm phím, rồi được thay bằng bóng thật khi server xác nhận. Nếu server từ chối, bóng dự đoán tự biến mất.
+- Bóng, tia nước và phi tiêu được vẽ theo dữ liệu **mới nhất** của server. Chỉ nhân vật của người khác mới được vẽ trễ một chút để chuyển động mượt.
+- Mở trang với `?debug` để xem trạng thái game qua biến `bb` trong Console.
 
 ## Bản đồ (8 bản đồ)
 

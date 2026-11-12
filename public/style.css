@@ -143,13 +143,29 @@ kbd { font: inherit; font-weight: 700; padding: 0 6px; border-radius: 6px; backg
 .chat-log b { color: var(--accent); }
 
 /* ---------- cửa hàng ---------- */
-.shop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+.shop-layout { display: grid; grid-template-columns: 280px 1fr; gap: 14px; align-items: start; }
+.shop-layout .panel { margin-bottom: 0; }
+.shop-side { position: sticky; top: 12px; }
+.shop-side h3 { margin-top: 12px; }
+.shop-preview { width: 100%; max-width: 240px; aspect-ratio: 240 / 170; display: block; margin: 0 auto; }
+.bag { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.bag-slot { position: relative; display: flex; flex-direction: column; align-items: center; padding: 4px 2px; border-radius: 12px; background: var(--input); }
+.bag-slot.empty { opacity: .45; }
+.bag-slot .cnt { font-weight: 800; font-size: .85rem; }
+.bag-slot kbd { position: absolute; top: 2px; right: 4px; font-size: .7rem; }
+.earn { background: var(--input); border-radius: 12px; padding: 6px 10px; }
+.tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
+.tab { font: inherit; font-weight: 700; border: 2px solid var(--line); background: var(--input); color: var(--text); border-radius: 999px; padding: 4px 14px; cursor: pointer; }
+.tab.on { background: var(--primary); border-color: var(--primary); color: #fff; }
+.shop-card.trying { border-color: var(--accent); }
+.shop-card .price { color: var(--primary); }
+.shop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
 .shop-card {
   display: grid; grid-template-columns: auto 1fr; gap: 6px 10px; align-items: center; padding: 10px;
   border-radius: 16px; background: var(--input); border: 3px solid transparent;
 }
 .shop-card.worn { border-color: #2fc46b; }
-.shop-card .info > b { display: block; font-size: 1.05rem; }
+.shop-card .info > b.nm { display: block; font-size: 1.05rem; }
 .shop-card .info small { display: block; color: var(--muted); line-height: 1.25; }
 .shop-card .have { font-size: .85rem; }
 .shop-card .acts { grid-column: 1 / -1; display: flex; gap: 6px; flex-wrap: wrap; }
@@ -202,6 +218,9 @@ kbd { font: inherit; font-weight: 700; padding: 0 6px; border-radius: 6px; backg
 .stat { display: flex; align-items: center; gap: 2px; background: var(--panel); border-radius: 999px; padding: 0 10px 0 2px; font-weight: 800; }
 .stat canvas { width: 30px; height: 30px; }
 .stat.off { opacity: .35; }
+.stat kbd { font-size: .7rem; padding: 0 4px; margin-left: 2px; }
+.stat.armed { background: #ff4d5e; color: #fff; animation: pulse 0.8s infinite; }
+.act-grid { display: grid; grid-template-columns: repeat(2, auto); gap: 6px; }
 
 /* ---------- nút cảm ứng ---------- */
 .touch { width: 100%; max-width: 760px; display: flex; justify-content: space-between; align-items: center; padding: 4px 8px 12px; user-select: none; }
@@ -213,7 +232,7 @@ kbd { font: inherit; font-weight: 700; padding: 0 6px; border-radius: 6px; backg
 .dpad button.on, .act:active { background: var(--accent); color: #fff; }
 .dpad .up { grid-area: 1 / 2; } .dpad .left { grid-area: 2 / 1; } .dpad .right { grid-area: 2 / 3; } .dpad .down { grid-area: 3 / 2; }
 .acts { display: flex; gap: 10px; align-items: center; }
-.act.sm { width: 58px; height: 58px; font-size: .95rem; font-weight: 700; }
+.act.sm { width: 58px; height: 44px; font-size: .85rem; font-weight: 700; padding: 0; }
 .act.bomb { width: 86px; height: 86px; border-radius: 50%; font-size: 2.2rem; background: linear-gradient(180deg, #7fd3ff, #2f8cff); }
 
 .toast {
@@ -225,6 +244,9 @@ kbd { font: inherit; font-weight: 700; padding: 0 6px; border-radius: 6px; backg
 @media (max-width: 760px) {
   #app { padding: 10px 12px; }
   .room-grid { grid-template-columns: 1fr; }
+  .shop-layout { grid-template-columns: 1fr; }
+  .shop-side { position: static; }
+  .shop-main { order: -1; }              /* màn nhỏ: danh sách hàng lên trước */
   .slots { grid-template-columns: repeat(2, 1fr); }
   .hud-top .pill { display: none; }
   .timer { font-size: 1.2rem; min-width: 60px; }
@@ -232,8 +254,11 @@ kbd { font: inherit; font-weight: 700; padding: 0 6px; border-radius: 6px; backg
   .touch { padding: 4px 0 12px; }
   .dpad { grid-template-columns: repeat(3, 50px); grid-template-rows: repeat(3, 50px); }
   .acts { gap: 6px; }
-  .act.sm { width: 50px; height: 50px; font-size: .85rem; }
+  .act.sm { width: 50px; height: 40px; font-size: .72rem; }
   .act.bomb { width: 74px; height: 74px; font-size: 1.9rem; }
   .stat canvas { width: 24px; height: 24px; }
   .stat { padding: 0 8px 0 2px; font-size: .9rem; }
 }
+
+/* máy cảm ứng không có bàn phím -> ẩn chữ phím tắt */
+@media (pointer: coarse) { .stat kbd { display: none; } }

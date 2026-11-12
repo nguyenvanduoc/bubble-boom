@@ -2,7 +2,7 @@
 // SẢNH & PHÒNG CHƠI. Không phụ thuộc WebSocket: chỉ cần hàm send(obj|string)
 // -> dùng được cả trên server Node.js lẫn chế độ offline trong trình duyệt.
 // ============================================================
-import { TICK_MS, TIMING, MAX_PLAYERS, CHARACTERS, CHAR_BY_ID, MAPS, MAP_BY_ID, TEAMS } from './constants.js';
+import { TICK_MS, TIMING, MAX_PLAYERS, CHARACTERS, CHAR_BY_ID, MAPS, MAP_BY_ID, TEAMS, SHOP } from './constants.js';
 import { Game } from './engine.js';
 import { thinkBot } from './bot.js';
 import { MemoryStore, buy, equip, takeLoadout, settle } from './profile.js';
@@ -56,7 +56,7 @@ export class Lobby {
         this.store.save();
         this.sendProfile(c, m.t === 'buy' ? 'Mua thành công!' : null);
         const me = room && room.status === 'waiting' && room.members.find((x) => x.id === c.id);
-        if (me) { me.gear = [...c.profile.equipped]; this.sendRoom(room); }
+        if (me) { Object.assign(me, this.looks(c)); this.sendRoom(room); }
         break;
       }
       case 'gear':
@@ -116,7 +116,9 @@ export class Lobby {
           const used = new Set(room.members.map((x) => x.name));
           const name = BOT_NAMES.find((n) => !used.has(n)) || 'Bot';
           const ch = CHARACTERS[(Math.random() * CHARACTERS.length) | 0];
-          this.addMember(room, { id: 'b' + this.seq++, name, charId: ch.id, bot: true, ready: true });
+          // bot thỉnh thoảng cũng diện đồ cho vui
+          const pick = (kind) => { const ids = Object.keys(SHOP).filter((id) => SHOP[id].kind === kind); return Math.random() < 0.4 ? ids[(Math.random() * ids.length) | 0] : null; };
+          this.addMember(room, { id: 'b' + this.seq++, name, charId: ch.id, bot: true, ready: true, gear: [], outfit: pick('outfit'), skin: pick('skin') });
           this.sendRoom(room); this.pushLobby();
         }
         break;
@@ -153,7 +155,13 @@ export class Lobby {
   }
 
   memberOf(c) {
-    return { id: c.id, name: c.name, charId: c.charId, bot: false, gear: c.profile ? [...c.profile.equipped] : [] };
+    return { id: c.id, name: c.name, charId: c.charId, bot: false, ...this.looks(c) };
+  }
+
+  /** Phụ kiện + trang phục + kiểu bóng đang dùng của 1 người */
+  looks(c) {
+    const p = c.profile;
+    return { gear: p ? [...p.equipped] : [], outfit: p?.outfit || null, skin: p?.skin || null };
   }
 
   sendProfile(c, msg) {
@@ -259,7 +267,7 @@ export class Lobby {
     this.broadcast(r, {
       t: 'room',
       room: { id: r.id, name: r.name, host: r.host, map: r.mapId, status: r.status, gear: r.gear,
-        members: r.members.map(({ id, name, charId, team, ready, bot, gear }) => ({ id, name, charId, team, ready, bot, gear: gear || [] })) },
+        members: r.members.map(({ id, name, charId, team, ready, bot, gear, outfit, skin }) => ({ id, name, charId, team, ready, bot, gear: gear || [], outfit, skin })) },
     });
   }
 

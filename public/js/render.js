@@ -24,8 +24,56 @@ function ell(ctx, x, y, rx, ry, fill) { ctx.beginPath(); ctx.ellipse(x, y, rx, r
 function circ(ctx, x, y, r, fill) { ell(ctx, x, y, r, r, fill); }
 
 // ---------------- NHÂN VẬT ----------------
-/** Vẽ nhân vật tại gốc toạ độ (0,0) = tâm ô. dir: 1 lên 2 xuống 3 trái 4 phải */
-export function drawCharacter(ctx, charId, dir = 2, t = 0, moving = false) {
+const HAT_OUTFITS = new Set(['pirate', 'wizard', 'crown']);
+
+/** Áo choàng đỏ bay phía sau */
+function drawCape(ctx, t, moving, front) {
+  const sway = Math.sin(t * (moving ? 14 : 3)) * (moving ? 4 : 1.5);
+  ctx.fillStyle = front ? '#d62839' : '#b81f30';
+  ctx.beginPath(); ctx.moveTo(-10, -2); ctx.lineTo(10, -2);
+  ctx.quadraticCurveTo(16 + sway, 12, 13 + sway, 24); ctx.lineTo(-13 + sway, 24);
+  ctx.quadraticCurveTo(-16 + sway, 12, -10, -2); ctx.fill();
+  ctx.fillStyle = '#ffd23f'; circ(ctx, -8, -1, 2.4, '#ffd23f'); circ(ctx, 8, -1, 2.4, '#ffd23f');
+}
+
+/** Mũ / kính của trang phục (vẽ đè lên đầu) */
+function drawOutfitTop(ctx, outfit, dir, side, t) {
+  switch (outfit) {
+    case 'pirate':
+      ell(ctx, 0, -18, 18, 5, '#22202a');
+      ctx.fillStyle = '#22202a'; ctx.beginPath(); ctx.arc(0, -19, 12, Math.PI, 0); ctx.fill();
+      ctx.fillStyle = '#ffd23f'; ctx.fillRect(-12, -20, 24, 2);
+      if (dir !== 1) {
+        circ(ctx, side * 3, -25, 3, '#fff');
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.4; ctx.beginPath();
+        ctx.moveTo(side * 3 - 4, -21); ctx.lineTo(side * 3 + 4, -27); ctx.moveTo(side * 3 + 4, -21); ctx.lineTo(side * 3 - 4, -27); ctx.stroke();
+      }
+      break;
+    case 'wizard':
+      ell(ctx, 0, -17, 18, 4.5, '#5b2a9e');
+      ctx.fillStyle = '#7b3fd6'; ctx.beginPath(); ctx.moveTo(-13, -18); ctx.quadraticCurveTo(-2, -30, 6 + Math.sin(t * 3) * 2, -44); ctx.quadraticCurveTo(6, -28, 13, -18); ctx.closePath(); ctx.fill();
+      star(ctx, -3, -26, 3.2, '#ffe066'); star(ctx, 4, -34, 2.4, '#ffe066'); star(ctx, 6 + Math.sin(t * 3) * 2, -44, 2.6, '#fff6a0');
+      break;
+    case 'crown':
+      ctx.fillStyle = '#f5c518'; ctx.beginPath();
+      ctx.moveTo(-12, -18); ctx.lineTo(-12, -29); ctx.lineTo(-6, -23); ctx.lineTo(0, -32); ctx.lineTo(6, -23); ctx.lineTo(12, -29); ctx.lineTo(12, -18); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#e0a800'; ctx.fillRect(-12, -21, 24, 3);
+      circ(ctx, 0, -25, 2.4, '#e2473d'); circ(ctx, -7, -21.5, 1.6, '#3d8bff'); circ(ctx, 7, -21.5, 1.6, '#3d8bff');
+      if (Math.sin(t * 4) > 0.7) star(ctx, 9, -31, 2.5, '#fff');
+      break;
+    case 'shades':
+      if (dir === 1) break;
+      ctx.fillStyle = '#16131f';
+      { const ex = side * 4 + side * 2.5;
+        rr(ctx, ex - 11, -8.5, 9.5, 6.5, 2.5); ctx.fill(); rr(ctx, ex + 1.5, -8.5, 9.5, 6.5, 2.5); ctx.fill();
+        ctx.fillRect(ex - 2, -7, 4, 1.6);
+        ctx.fillStyle = 'rgba(255,255,255,.6)'; ctx.fillRect(ex - 9, -7.5, 3, 1.3); ctx.fillRect(ex + 3.5, -7.5, 3, 1.3); }
+      break;
+  }
+}
+
+/** Vẽ nhân vật tại gốc toạ độ (0,0) = tâm ô. dir: 1 lên 2 xuống 3 trái 4 phải. outfit: trang phục từ cửa hàng */
+export function drawCharacter(ctx, charId, dir = 2, t = 0, moving = false, outfit = null) {
   const ch = CHAR_BY_ID[charId] || CHAR_BY_ID.bin;
   const hair = HAIR[ch.hat];
   const step = moving ? Math.sin(t * 14) : 0;
@@ -41,6 +89,7 @@ export function drawCharacter(ctx, charId, dir = 2, t = 0, moving = false) {
     ctx.save(); ctx.translate(-side * 10 || 10, 4); ctx.rotate(side ? -side * 0.5 : 0.3);
     ell(ctx, 0, -6, 8, 13, ch.body); ell(ctx, 1, -9, 4, 8, '#e0b080'); ctx.restore();
   }
+  if (outfit === 'cape' && dir !== 1) drawCape(ctx, t, moving, false);
   // thân
   ell(ctx, 0, 8, 12.5, 10.5, ch.body);
   ell(ctx, side * 2, 10, 7.5, 6.5, 'rgba(255,255,255,0.35)');
@@ -69,8 +118,9 @@ export function drawCharacter(ctx, charId, dir = 2, t = 0, moving = false) {
     if (!side) { circ(ctx, -9.5, -0.5, 2.6, 'rgba(255,110,130,0.45)'); circ(ctx, 9.5, -0.5, 2.6, 'rgba(255,110,130,0.45)'); }
     ctx.strokeStyle = '#7a3b3b'; ctx.lineWidth = 1.3; ctx.beginPath(); ctx.arc(ex, -1, 2.4, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
   }
-  // phụ kiện đầu
-  switch (ch.hat) {
+  if (outfit === 'cape' && dir === 1) drawCape(ctx, t, moving, true);
+  // phụ kiện đầu (bỏ qua nếu đang đội mũ từ cửa hàng)
+  switch (HAT_OUTFITS.has(outfit) ? '' : ch.hat) {
     case 'cap':
       ctx.fillStyle = ch.body; ctx.beginPath(); ctx.arc(0, -13, 13.5, Math.PI, 0); ctx.fill();
       if (dir !== 1) ell(ctx, side * 9, -13, 11, 3.6, ch.acc);
@@ -102,14 +152,76 @@ export function drawCharacter(ctx, charId, dir = 2, t = 0, moving = false) {
       circ(ctx, 0, -22, 3.6, '#ff8cc0');
       break;
   }
+  if (outfit) drawOutfitTop(ctx, outfit, dir, side, t);
   ctx.restore();
+}
+
+// ---------------- BÓNG NƯỚC (các kiểu skin) ----------------
+/** Vẽ thân quả bóng tại gốc toạ độ, bán kính 16. flash: nháy đỏ sắp nổ */
+export function drawBalloon(ctx, skin, flash = false, t = 0) {
+  const grad = (a, b, c) => { const g = ctx.createRadialGradient(-5, -6, 2, 0, 0, 18); g.addColorStop(0, a); g.addColorStop(0.5, b); g.addColorStop(1, c); return g; };
+  ctx.save();
+  switch (skin) {
+    case 'straw':
+      circ(ctx, 0, 0, 16, grad('#ffb3b3', '#ff4d5e', '#c81d34'));
+      for (const [x, y] of [[-7, -2], [0, -7], [6, 0], [-3, 6], [5, 8], [-9, 6], [9, -6]]) ell(ctx, x, y, 1.3, 2, '#ffe066');
+      ctx.fillStyle = '#2fc46b'; for (const a of [-0.6, 0, 0.6]) { ctx.save(); ctx.rotate(a); ctx.beginPath(); ctx.moveTo(-3, -14); ctx.lineTo(0, -21); ctx.lineTo(3, -14); ctx.fill(); ctx.restore(); }
+      break;
+    case 'melon':
+      circ(ctx, 0, 0, 16, grad('#b6f5c4', '#3fbf5f', '#1f7a3a'));
+      ctx.save(); ctx.beginPath(); ctx.arc(0, 0, 16, 0, Math.PI * 2); ctx.clip();
+      ctx.strokeStyle = '#1b6b33'; ctx.lineWidth = 3;
+      for (const x of [-10, -3.5, 3.5, 10]) { ctx.beginPath(); ctx.moveTo(x * 0.6, -17); ctx.quadraticCurveTo(x * 1.25, 0, x * 0.6, 17); ctx.stroke(); }
+      ctx.restore();
+      break;
+    case 'pumpkin':
+      circ(ctx, 0, 0, 16, grad('#ffd59e', '#ff9a2e', '#d9650f'));
+      ctx.strokeStyle = 'rgba(180,80,10,.55)'; ctx.lineWidth = 1.6;
+      for (const rx of [5, 10.5]) { ctx.beginPath(); ctx.ellipse(0, 0, rx, 15.5, 0, 0, Math.PI * 2); ctx.stroke(); }
+      ctx.fillStyle = '#6d4a24'; rr(ctx, -2, -21, 4, 7, 1.5); ctx.fill();
+      ell(ctx, 5, -17, 5, 2.4, '#2fc46b');
+      break;
+    case 'star':
+      circ(ctx, 0, 0, 16, grad('#fff6c2', '#ffd23f', '#f29a00'));
+      star(ctx, 0, 1, 9, '#fffdf0');
+      break;
+    case 'gold':
+      circ(ctx, 0, 0, 16, grad('#fffbe0', '#f5c518', '#a77300'));
+      star(ctx, -6, -6, 3.5 + Math.sin(t * 6) * 1.2, '#ffffff'); star(ctx, 7, 5, 2.2, '#fff6c2');
+      break;
+    case 'remote':                                   // Bom Hẹn Giờ: bóng sẫm màu có ăng-ten
+      circ(ctx, 0, 0, 16, grad('#7d8299', '#3a3f55', '#1a1c27'));
+      ctx.strokeStyle = '#ffd23f'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(0, 0, 11, 0.2, Math.PI - 0.2); ctx.stroke();
+      ctx.strokeStyle = '#9aa0b5'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(4, -14); ctx.lineTo(8, -23); ctx.stroke();
+      circ(ctx, 8, -24, 3, Math.floor(t * 4) % 2 ? '#ff4d5e' : '#7a1f2a');
+      break;
+    default:
+      circ(ctx, 0, 0, 16, grad('#bfe9ff', '#3fa5ff', '#1c63d6'));
+  }
+  if (skin !== 'remote') circ(ctx, -6, -6, 4, 'rgba(255,255,255,.7)');
+  if (flash) circ(ctx, 0, 0, 16, 'rgba(255,90,90,.55)');
+  ctx.restore();
+}
+
+/** Phi tiêu */
+function drawDartShape(ctx) {
+  ctx.fillStyle = '#c7d3e0'; ctx.beginPath(); ctx.moveTo(14, 0); ctx.lineTo(6, -3); ctx.lineTo(6, 3); ctx.fill();
+  ctx.fillStyle = '#7a4a24'; ctx.fillRect(-8, -1.5, 15, 3);
+  ctx.fillStyle = '#e2473d'; ctx.beginPath(); ctx.moveTo(-8, 0); ctx.lineTo(-15, -6); ctx.lineTo(-11, 0); ctx.lineTo(-15, 6); ctx.fill();
 }
 
 // ---------------- VẬT PHẨM ----------------
 const ITEM_COLORS = { bomb: '#2f8cff', range: '#22c3e6', speed: '#ffb21a', maxrange: '#a24bff', needle: '#8aa0b8', shield: '#ffcc33', kick: '#ff5a4f', mount: '#3ed37a',
-  boots: '#2f8cff', bag: '#ff7a2f', nozzle: '#22c3e6', glove: '#ffb21a', vest: '#ff5a4f' };
+  boots: '#2f8cff', bag: '#ff7a2f', nozzle: '#22c3e6', glove: '#ffb21a', vest: '#ff5a4f',
+  dart: '#e2473d', remote: '#3a3f55', outfit: '#a55bff', skin: '#ff8fb8' };
 function drawItemIcon(ctx, type) {
+  if (type.startsWith('outfit:')) {              // trang phục: vẽ nhân vật Bin mặc thử
+    ctx.save(); ctx.translate(0, 5); ctx.scale(0.5, 0.5); drawCharacter(ctx, 'bin', 2, 0, false, type.slice(7)); ctx.restore(); return;
+  }
+  if (type.startsWith('skin:')) { ctx.save(); ctx.scale(0.72, 0.72); drawBalloon(ctx, type.slice(5)); ctx.restore(); return; }
   switch (type) {
+    case 'dart': ctx.save(); ctx.rotate(-0.7); ctx.scale(0.95, 0.95); drawDartShape(ctx); ctx.restore(); break;
+    case 'remote': ctx.save(); ctx.translate(-1, 3); ctx.scale(0.62, 0.62); drawBalloon(ctx, 'remote', false, 0.6); ctx.restore(); break;
     case 'bomb':
       circ(ctx, 0, 2, 9, '#2f8cff'); circ(ctx, -3, -1, 3, 'rgba(255,255,255,.7)');
       ctx.fillStyle = '#1b5fc0'; ctx.beginPath(); ctx.moveTo(-3, -7); ctx.lineTo(3, -7); ctx.lineTo(0, -4); ctx.fill();
@@ -184,7 +296,7 @@ function star(ctx, x, y, r, fill) {
 export function drawItem(ctx, type, x, y, t = 0) {
   ctx.save(); ctx.translate(x, y + Math.sin(t * 4 + x) * 2);
   circ(ctx, 0, 0, 18, 'rgba(255,255,255,0.85)');
-  ctx.lineWidth = 2.5; ctx.strokeStyle = ITEM_COLORS[type]; ctx.beginPath(); ctx.arc(0, 0, 17, 0, Math.PI * 2); ctx.stroke();
+  ctx.lineWidth = 2.5; ctx.strokeStyle = ITEM_COLORS[type] || ITEM_COLORS[type.split(':')[0]]; ctx.beginPath(); ctx.arc(0, 0, 17, 0, Math.PI * 2); ctx.stroke();
   drawItemIcon(ctx, type);
   ctx.restore();
 }
@@ -418,6 +530,7 @@ export class Renderer {
     for (const b of view.bombs) sprites.push({ y: b.y, fn: () => this.drawBomb(b, t, view) });
     for (const p of view.players) if (p.state !== 'dead' || view.time - (p.deadT || 0) < 0) sprites.push({ y: p.y + 0.01, fn: () => this.drawPlayer(p, t, p.id === view.myId) });
     sprites.sort((a, b) => a.y - b.y).forEach((s) => s.fn());
+    for (const d of view.darts || []) this.drawDart(d);
 
     // tường rơi (thu hẹp bản đồ)
     this.drops = this.drops.filter((d) => {
@@ -466,27 +579,34 @@ export class Renderer {
 
   drawBomb(b, t, view) {
     const { ctx } = this;
-    const left = b.left;                                             // ms còn lại tới lúc nổ
-    const k = 1 - left / TIMING.BOMB_FUSE;
-    const freq = 4 + k * 14;
-    const s = 1 + Math.sin(t * freq) * (0.05 + k * 0.07);
+    const total = b.remote ? TIMING.REMOTE_MAX : TIMING.BOMB_FUSE;
+    const left = Math.max(0, b.left);                                // ms còn lại tới lúc nổ
+    const k = 1 - left / total;
+    const freq = b.remote ? 3 : 4 + k * 14;
+    const s = 1 + Math.sin(t * freq) * (0.05 + (b.remote ? 0 : k * 0.07));
     const x = b.x * TILE + 24, y = b.y * TILE + 25;
     const owner = view.players.find((p) => p.id === b.owner);
     const team = owner ? TEAMS[owner.team].color : '#2f8cff';
     ell(ctx, x, y + 15, 14, 4, 'rgba(0,0,0,.2)');
     ctx.save(); ctx.translate(x, y); ctx.scale(s, 1 / s);
-    const flash = left < 600 && Math.floor(t * 16) % 2 === 0;
-    const g = ctx.createRadialGradient(-5, -6, 2, 0, 0, 18);
-    g.addColorStop(0, flash ? '#ffffff' : '#bfe9ff'); g.addColorStop(0.5, flash ? '#ffd0d0' : '#3fa5ff'); g.addColorStop(1, flash ? '#ff5a5a' : '#1c63d6');
-    circ(ctx, 0, 0, 16, g);
-    circ(ctx, -6, -6, 4, 'rgba(255,255,255,.75)');
-    ctx.fillStyle = team; ctx.beginPath(); ctx.moveTo(-4, -17); ctx.lineTo(4, -17); ctx.lineTo(0, -12); ctx.fill();
+    if (b.ghost) ctx.globalAlpha = 0.85;                             // bóng dự đoán, chờ server xác nhận
+    drawBalloon(ctx, b.remote ? 'remote' : owner?.skin, !b.remote && left < 600 && Math.floor(t * 16) % 2 === 0, t);
+    if (!b.remote) { ctx.fillStyle = team; ctx.beginPath(); ctx.moveTo(-4, -17); ctx.lineTo(4, -17); ctx.lineTo(0, -12); ctx.fill(); }
     ctx.restore();
-    // vòng đếm thời gian nổ
+    // vòng đếm thời gian nổ (Bom Hẹn Giờ: vòng tím = thời gian tự nổ)
     ctx.lineWidth = 3; ctx.lineCap = 'round';
     ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.beginPath(); ctx.arc(x, y, 21, 0, Math.PI * 2); ctx.stroke();
-    ctx.strokeStyle = left < 1000 ? '#ff4d5e' : left < 2000 ? '#ffc21a' : '#ffffff';
-    ctx.beginPath(); ctx.arc(x, y, 21, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (left / TIMING.BOMB_FUSE)); ctx.stroke();
+    ctx.strokeStyle = b.remote ? '#a55bff' : left < 1000 ? '#ff4d5e' : left < 2000 ? '#ffc21a' : '#ffffff';
+    ctx.beginPath(); ctx.arc(x, y, 21, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (left / total)); ctx.stroke();
+  }
+
+  drawDart(d) {
+    const { ctx } = this;
+    ctx.save(); ctx.translate(d.x * TILE + 24, d.y * TILE + 24);
+    ctx.rotate([0, -Math.PI / 2, Math.PI / 2, Math.PI, 0][d.d]);
+    ctx.globalAlpha = 0.35; ctx.fillStyle = '#fff'; ctx.fillRect(-30, -1, 18, 2); ctx.globalAlpha = 1;
+    drawDartShape(ctx);
+    ctx.restore();
   }
 
   drawPlayer(p, t, isMe) {
@@ -508,7 +628,7 @@ export class Renderer {
       ctx.restore(); ctx.translate(0, -8);
     }
     if (trapped) ctx.translate(0, Math.sin(t * 3) * 3 - 4);
-    drawCharacter(ctx, p.charId, p.dir, t + (p.id.charCodeAt(1) || 0), p.moving && !trapped);
+    drawCharacter(ctx, p.charId, p.dir, t + (p.id.charCodeAt(1) || 0), p.moving && !trapped, p.outfit);
     if (trapped) {                                                   // bị nhốt trong bong bóng
       const wob = 1 + Math.sin(t * 6) * 0.04;
       ctx.save(); ctx.scale(wob, 1 / wob);
@@ -538,14 +658,28 @@ export class Renderer {
 }
 
 /** Vẽ ảnh xem trước nhân vật vào 1 canvas nhỏ (dùng ở menu) */
-export function paintCharPreview(canvas, charId, t = 0) {
+export function paintCharPreview(canvas, charId, t = 0, outfit = null) {
   const ctx = canvas.getContext('2d');
   const d = Math.min(window.devicePixelRatio || 1, 2);
   if (canvas.width !== 64 * d) { canvas.width = 64 * d; canvas.height = 64 * d; }
   ctx.setTransform(d, 0, 0, d, 0, 0); ctx.clearRect(0, 0, 64, 64);
   ctx.translate(32, 36);
   ell(ctx, 0, 21, 14, 4, 'rgba(0,0,0,.15)');
-  drawCharacter(ctx, charId, 2, t, false);
+  drawCharacter(ctx, charId, 2, t, false, outfit);
+}
+
+/** Khung xem trước trong cửa hàng: nhân vật mặc trang phục + quả bóng đang dùng */
+export function paintShopPreview(canvas, charId, outfit, skin, t = 0) {
+  const ctx = canvas.getContext('2d');
+  const d = Math.min(window.devicePixelRatio || 1, 2), w = 240, h = 170;
+  if (canvas.width !== w * d) { canvas.width = w * d; canvas.height = h * d; }
+  ctx.setTransform(d, 0, 0, d, 0, 0); ctx.clearRect(0, 0, w, h);
+  const g = ctx.createLinearGradient(0, 0, 0, h); g.addColorStop(0, '#bfe9ff'); g.addColorStop(1, '#93d46e');
+  rr(ctx, 0, 0, w, h, 16); ctx.fillStyle = g; ctx.fill();
+  ell(ctx, 90, 150, 34, 8, 'rgba(0,0,0,.15)'); ell(ctx, 180, 150, 20, 5, 'rgba(0,0,0,.15)');
+  ctx.save(); ctx.translate(90, 104); ctx.scale(2.1, 2.1); drawCharacter(ctx, charId, 2, t, false, outfit); ctx.restore();
+  ctx.save(); ctx.translate(180, 118 + Math.sin(t * 3) * 3); ctx.scale(1.5, 1.5); drawBalloon(ctx, skin, false, t);
+  ctx.fillStyle = '#3d8bff'; ctx.beginPath(); ctx.moveTo(-4, -17); ctx.lineTo(4, -17); ctx.lineTo(0, -12); ctx.fill(); ctx.restore();
 }
 
 /** Ảnh thu nhỏ bản đồ */
