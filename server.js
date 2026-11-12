@@ -4,13 +4,13 @@
 // ============================================================
 import http from 'node:http';
 import { readFile } from 'node:fs/promises';
-import { extname, join, normalize } from 'node:path';
+import { extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 import { Lobby } from './public/shared/rooms.js';
 
 const PORT = Number(process.env.PORT) || 3000;
-const PUBLIC = join(fileURLToPath(new URL('.', import.meta.url)), 'public');
+const PUBLIC = resolve(join(fileURLToPath(new URL('.', import.meta.url)), 'public'));
 const MIME = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.svg': 'image/svg+xml',
@@ -22,10 +22,12 @@ const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, 'http://x');
     if (url.pathname === '/health') { res.writeHead(200); return res.end('ok'); }
-    let path = normalize(decodeURIComponent(url.pathname)).replace(/^(\.\.[/\\])+/, '');
-    if (path.endsWith('/')) path += 'index.html';
-    const file = join(PUBLIC, path);
-    if (!file.startsWith(PUBLIC)) { res.writeHead(403); return res.end(); }   // chặn ../ đọc file ngoài
+    // Xét dấu '/' trên URL TRƯỚC khi đổi sang đường dẫn hệ điều hành
+    // (Windows dùng '\' nên kiểm tra sau khi normalize sẽ sai -> lỗi "Not found")
+    let rel = decodeURIComponent(url.pathname);
+    if (rel.endsWith('/')) rel += 'index.html';
+    const file = resolve(PUBLIC, '.' + rel);
+    if (!file.startsWith(PUBLIC + sep)) { res.writeHead(403); return res.end(); } // chặn ../ đọc file ngoài
     const data = await readFile(file);
     res.writeHead(200, { 'Content-Type': MIME[extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-cache' });
     res.end(data);
