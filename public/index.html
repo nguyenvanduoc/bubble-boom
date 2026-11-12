@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Bubble Boom</title>
+  <meta name="description" content="Game thả bóng nước nhiều người chơi online">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main id="app">
+  <!-- ============ MÀN HÌNH CHÍNH ============ -->
+  <section id="scr-home" class="screen active">
+    <header class="logo">
+      <h1>Bubble<span>Boom</span></h1>
+      <p>Thả bóng nước · nhốt đối thủ · chọc vỡ bong bóng!</p>
+    </header>
+    <div class="panel">
+      <label class="field"><span>Tên của bạn</span><input id="in-name" maxlength="16" placeholder="Nhập tên..." autocomplete="off"></label>
+      <h3>Chọn nhân vật</h3>
+      <div id="char-grid" class="char-grid"></div>
+      <div class="row gap wrap">
+        <button id="btn-online" class="btn primary big">🌐 Chơi Online</button>
+        <button id="btn-offline" class="btn big">🤖 Chơi với Bot</button>
+      </div>
+      <p id="server-note" class="muted small"></p>
+    </div>
+    <div class="panel help">
+      <h3>Cách chơi</h3>
+      <div class="keys">
+        <div><kbd>←↑↓→</kbd> / <kbd>WASD</kbd> Di chuyển</div>
+        <div><kbd>Space</kbd> / <kbd>J</kbd> Đặt bóng nước</div>
+        <div><kbd>Z</kbd> / <kbd>K</kbd> Dùng kim (khi bị nhốt)</div>
+        <div><kbd>X</kbd> / <kbd>L</kbd> Bật khiên</div>
+        <div><kbd>Enter</kbd> Chat trong trận</div>
+      </div>
+      <p class="muted small">Bóng nổ sau <b>3 giây</b>. Trúng tia nước sẽ bị nhốt trong bong bóng <b>4.5 giây</b>: đồng đội chạm vào để cứu, đối thủ chạm vào là vỡ. Còn 45 giây cuối, bản đồ bắt đầu thu hẹp!</p>
+      <div id="item-help" class="item-help"></div>
+    </div>
+  </section>
+
+  <!-- ============ SẢNH ============ -->
+  <section id="scr-lobby" class="screen">
+    <div class="topbar">
+      <button class="btn ghost" id="lobby-back">← Về</button>
+      <h2>Sảnh chờ</h2>
+      <span id="online-count" class="pill"></span>
+    </div>
+    <div class="panel">
+      <h3>Tạo phòng mới</h3>
+      <div class="row gap wrap">
+        <input id="in-room-name" maxlength="24" placeholder="Tên phòng">
+        <select id="in-room-map"></select>
+        <button id="btn-create" class="btn primary">Tạo phòng</button>
+      </div>
+      <div class="row gap wrap mt">
+        <input id="in-code" maxlength="4" placeholder="Mã phòng (VD: K7QX)">
+        <button id="btn-join" class="btn">Vào bằng mã</button>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="row between"><h3>Danh sách phòng</h3><button id="btn-refresh" class="btn ghost small">Làm mới</button></div>
+      <div id="room-list" class="room-list"></div>
+    </div>
+  </section>
+
+  <!-- ============ PHÒNG CHỜ ============ -->
+  <section id="scr-room" class="screen">
+    <div class="topbar">
+      <button class="btn ghost" id="room-leave">← Rời phòng</button>
+      <h2 id="room-title"></h2>
+      <button id="room-copy" class="pill" title="Sao chép link mời">Mã <b id="room-code"></b> 📋</button>
+    </div>
+    <div class="room-grid">
+      <div class="panel">
+        <h3>Người chơi <span id="room-count" class="muted"></span></h3>
+        <div id="slots" class="slots"></div>
+        <div class="row gap wrap mt">
+          <button id="btn-addbot" class="btn">+ Thêm bot</button>
+          <button id="btn-ready" class="btn primary big">Sẵn sàng</button>
+        </div>
+        <p class="muted small">Cùng màu đội = đồng đội (chạm để cứu nhau). Khác màu = đối thủ.</p>
+      </div>
+      <div class="side">
+        <div class="panel"><h3>Bản đồ</h3><div id="map-list" class="map-list"></div></div>
+        <div class="panel"><h3>Đổi nhân vật</h3><div id="room-chars" class="char-row"></div></div>
+        <div class="panel chat">
+          <div id="chat-log" class="chat-log"></div>
+          <form id="chat-form" class="row gap"><input id="chat-in" maxlength="120" placeholder="Nhắn gì đó..." autocomplete="off"><button class="btn">Gửi</button></form>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ TRẬN ĐẤU ============ -->
+  <section id="scr-game" class="screen">
+    <div class="hud-top">
+      <button id="game-exit" class="btn ghost small" title="Thoát trận">✕</button>
+      <div id="hud-timer" class="timer">3:00</div>
+      <div id="hud-players" class="hud-players"></div>
+      <span id="hud-ping" class="pill small"></span>
+      <button id="btn-mute" class="btn ghost small" title="Tắt/bật âm thanh">🔊</button>
+    </div>
+    <div class="stage">
+      <canvas id="cv"></canvas>
+      <div id="countdown" class="countdown"></div>
+      <div id="game-chat" class="game-chat"></div>
+      <form id="game-chat-form" class="game-chat-form hidden"><input id="game-chat-in" maxlength="120" placeholder="Enter để gửi · Esc để huỷ" autocomplete="off"></form>
+      <div id="result" class="result hidden"></div>
+    </div>
+    <div id="hud-me" class="hud-me"></div>
+    <div id="touch" class="touch hidden">
+      <div class="dpad">
+        <button data-dir="1" class="up">▲</button><button data-dir="3" class="left">◀</button>
+        <button data-dir="4" class="right">▶</button><button data-dir="2" class="down">▼</button>
+      </div>
+      <div class="acts">
+        <button data-act="n" class="act sm">Kim</button>
+        <button data-act="s" class="act sm">Khiên</button>
+        <button data-act="b" class="act bomb">💧</button>
+      </div>
+    </div>
+  </section>
+</main>
+<div id="toast" class="toast"></div>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
