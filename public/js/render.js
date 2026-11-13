@@ -448,6 +448,19 @@ export class Renderer {
     this.theme = 0; this.grid = ''; this.particles = []; this.shake = 0; this.breakStart = new Map(); this.drops = [];
   }
 
+  /**
+   * Đổi độ phân giải vẽ (khi phóng to toàn màn hình) để hình không bị mờ.
+   * pr = số điểm ảnh thật cho mỗi điểm ảnh của bàn chơi gốc 720x624.
+   */
+  resize(pr) {
+    pr = Math.min(3, Math.max(1, Math.round(pr * 4) / 4));     // làm tròn 0.25 để không vẽ lại liên tục
+    if (pr === this.dpr) return;
+    this.dpr = pr;
+    this.cv.width = W * pr; this.cv.height = H * pr;
+    this.layer.width = W * pr; this.layer.height = H * pr;
+    this.grid = '';                                             // buộc vẽ lại lớp nền
+  }
+
   /** Chọn bản đồ: lấy chủ đề màu + vị trí các ô nước '~' */
   setMap(mapDef) { this.theme = mapDef.theme; this.rows = mapDef.rows; this.grid = ''; }
 

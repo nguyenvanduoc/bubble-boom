@@ -34,6 +34,13 @@ Cửa hàng có 4 tab. Mua thì trừ xu ngay; vật phẩm được tự độn
 - **Ví online** lưu trên server ở file `data/profiles.json` (đổi chỗ lưu bằng biến `DATA_FILE`). **Ví offline** lưu trong trình duyệt.
 - Một số dịch vụ miễn phí xoá ổ đĩa mỗi lần khởi động lại. Khi đó cần gắn ổ đĩa lưu trữ (persistent disk) để giữ ví.
 
+## Toàn màn hình
+
+- Trong trận, bấm nút **⛶** trên thanh HUD hoặc phím **F** để vào toàn màn hình. Bấm **🗗**, **F** hoặc **Esc** để thu nhỏ lại.
+- Bàn chơi tự phóng to vừa màn hình (giữ tỉ lệ 15:13) và vẽ ở độ phân giải cao nên không bị mờ.
+- Trên Android, game tự xoay ngang khi bật toàn màn hình. Trên iPhone (Safari không hỗ trợ API toàn màn hình), game phóng bàn chơi chiếm hết cửa sổ thay thế.
+- Khi điện thoại xoay ngang, cần điều khiển nằm bên trái, nút hành động bên phải, bàn chơi ở giữa.
+
 ## Xu lấy từ đâu?
 
 1. **Người mới** được tặng 300 xu.
@@ -93,7 +100,7 @@ Bất kỳ dịch vụ nào hỗ trợ **Node.js + WebSocket** đều dùng đư
 | `MATCH_TIME` | 3 phút | Thời lượng tối đa 1 trận |
 | `SUDDEN_DEATH` | 45s cuối | Tường rơi xoắn ốc để thu hẹp bản đồ |
 
-**Phím:** ←↑↓→ / WASD di chuyển · Space/J đặt bóng · Z/K dùng kim · X/L bật khiên · Enter chat.
+**Phím:** ←↑↓→ / WASD di chuyển · Space/J đặt bóng · Z kim · X khiên · C phi tiêu · V bom hẹn giờ · Enter chat · **F toàn màn hình / thu nhỏ**.
 
 ## Cấu trúc
 

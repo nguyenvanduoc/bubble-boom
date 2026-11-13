@@ -374,10 +374,13 @@ function startGame(m) {
   renderer.particles = [];
   $('#result').classList.add('hidden');
   $('#game-chat').innerHTML = '';
-  $('#touch').classList.toggle('hidden', !(matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0));
+  const touchUi = matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
+  $('#touch').classList.toggle('hidden', !touchUi);
+  document.body.classList.toggle('touch-ui', touchUi);
   buildMeHud();
   document.activeElement?.blur();
   show('scr-game');
+  requestAnimationFrame(fitCanvas);
 }
 function endGameView() { S.game = null; $('#result').classList.add('hidden'); }
 
@@ -387,6 +390,53 @@ $('#game-exit').onclick = (e) => {
   if (performance.now() - exitArmed > 2500) { exitArmed = performance.now(); return toast('Bấm ✕ lần nữa để thoát trận'); }
   if (S.offline) { closeConn(); show('scr-home'); } else { S.conn.send({ t: 'leave' }); S.game = null; S.room = null; }
 };
+// ---------------- TOÀN MÀN HÌNH / THU NHỎ ----------------
+// Dùng Fullscreen API (có tiền tố webkit cho Safari). Trình duyệt không hỗ trợ (iPhone)
+// -> "toàn màn hình giả": phóng bàn chơi chiếm hết cửa sổ bằng CSS.
+const root = document.documentElement;
+const fsElement = () => document.fullscreenElement || document.webkitFullscreenElement;
+const isFull = () => !!fsElement() || document.body.classList.contains('fs-fake');
+async function toggleFullscreen() {
+  if (isFull()) {
+    try { screen.orientation?.unlock?.(); } catch { /* không hỗ trợ */ }
+    if (fsElement()) await (document.exitFullscreen || document.webkitExitFullscreen).call(document).catch(() => {});
+    document.body.classList.remove('fs-fake');
+  } else {
+    const req = root.requestFullscreen || root.webkitRequestFullscreen;
+    try {
+      if (!req) throw new Error('không hỗ trợ');
+      await req.call(root, { navigationUI: 'hide' });
+      // Điện thoại Android: tự xoay ngang cho bàn chơi to hơn (iPhone không hỗ trợ -> bỏ qua)
+      if (document.body.classList.contains('touch-ui')) screen.orientation?.lock?.('landscape').catch(() => {});
+    } catch {
+      document.body.classList.add('fs-fake');
+    }
+  }
+  updateFullscreenUi();
+}
+function updateFullscreenUi() {
+  const on = isFull();
+  document.body.classList.toggle('fs', on);
+  const b = $('#btn-fs');
+  b.textContent = on ? '🗗' : '⛶';
+  b.title = on ? 'Thu nhỏ (phím F hoặc Esc)' : 'Toàn màn hình (phím F)';
+  requestAnimationFrame(fitCanvas);
+}
+/** Vẽ canvas đúng độ phân giải màn hình theo kích thước đang hiển thị */
+function fitCanvas() {
+  const cv = $('#cv');
+  if (cv.clientWidth) renderer.resize((cv.clientWidth * (window.devicePixelRatio || 1)) / (TILE * 15));
+}
+$('#btn-fs').onclick = (e) => { e.currentTarget.blur(); toggleFullscreen(); };
+document.addEventListener('fullscreenchange', updateFullscreenUi);
+document.addEventListener('webkitfullscreenchange', updateFullscreenUi);
+addEventListener('resize', () => requestAnimationFrame(fitCanvas));
+addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT' || e.repeat) return;
+  if (e.code === 'KeyF' && currentScreen() === 'scr-game') { e.preventDefault(); toggleFullscreen(); }
+  if (e.code === 'Escape' && document.body.classList.contains('fs-fake')) toggleFullscreen();   // Esc thoát chế độ giả
+});
+
 $('#btn-mute').onclick = (e) => { e.currentTarget.textContent = sfx.toggle() ? '🔇' : '🔊'; e.currentTarget.blur(); };
 
 // chat trong trận

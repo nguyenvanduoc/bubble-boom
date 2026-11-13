@@ -265,3 +265,33 @@ kbd { font: inherit; font-weight: 700; padding: 0 6px; border-radius: 6px; backg
 
 .pid-line { margin: 0 0 10px; }
 .pid-line .pid { font-family: ui-monospace, Consolas, monospace; letter-spacing: 1px; color: var(--primary); }
+
+/* ---------- toàn màn hình ---------- */
+:root { --fs-reserve: 112px; }                  /* chiều cao dành cho HUD trên + dưới */
+body.touch-ui { --fs-reserve: 300px; }          /* điện thoại: chừa chỗ cho nút cảm ứng */
+body.fs { overflow: hidden; background: radial-gradient(circle at 50% 30%, var(--bg2), var(--bg1) 70%); }
+body.fs #app { max-width: none; padding: 6px 10px; }
+body.fs #scr-game.active { height: calc(100vh - 12px); height: calc(100dvh - 12px); justify-content: center; gap: 6px; }
+/* bàn chơi to nhất có thể mà vẫn giữ tỉ lệ 15:13 */
+body.fs .stage, body.fs .hud-top {
+  max-width: none;
+  width: min(calc(100vw - 24px), calc((100vh - var(--fs-reserve)) * 15 / 13));
+  width: min(calc(100vw - 24px), calc((100dvh - var(--fs-reserve)) * 15 / 13));
+}
+body.fs .hud-me, body.fs .touch { max-width: none; }
+body.fs-fake #app { position: fixed; inset: 0; z-index: 5; overflow: hidden;
+  background: radial-gradient(circle at 50% 30%, var(--bg2), var(--bg1) 70%); }
+
+/* Điện thoại xoay ngang: bàn chơi ở giữa, cần điều khiển bên trái, nút hành động bên phải */
+@media (orientation: landscape) and (max-height: 520px) {
+  body.touch-ui { --fs-reserve: 64px; }
+  body.touch-ui #scr-game.active .hud-me { display: none; }
+  body.touch-ui #scr-game.active .touch {
+    position: fixed; left: 0; right: 0; bottom: 8px; max-width: none; padding: 0 12px;
+    pointer-events: none; z-index: 6;
+  }
+  body.touch-ui #scr-game.active .touch > * { pointer-events: auto; }
+  body.touch-ui #scr-game.active .stage, body.touch-ui #scr-game.active .hud-top {
+    width: min(calc(100vw - 420px), calc((100dvh - var(--fs-reserve)) * 15 / 13));
+  }
+}
